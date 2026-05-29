@@ -18,11 +18,15 @@ Aufruf: <http://localhost:3737>
 
 ## SSH-Tunnel zur Prod-OrientDB
 
+**Empfohlen: automatisch.** Setz in `.env` einfach `SSH_HOST=<prod-host>` (plus `SSH_USER` etc., siehe `.env.example`) — der Server öffnet `ssh -N -L 2480:localhost:2480 <user>@<host>` beim Start selbst und beendet sich, wenn der Tunnel kippt. Voraussetzung: SSH-Key liegt beim Ziel-User (`BatchMode=yes`, kein Passwort-Prompt). Wenn Port 2480 lokal schon offen ist (du tunnelst manuell oder OrientDB läuft lokal), überspringt er den Spawn.
+
+**Manuell:**
+
 ```bash
 ssh -L 2480:localhost:2480 deploy@<prod-host>
 ```
 
-Solange der Tunnel offen ist, zeigt `ORIENTDB_URL=http://localhost:2480` auf die Prod-DB.
+`ORIENTDB_URL=http://localhost:2480` zeigt dann auf das lokale Tunnel-Ende.
 
 ## Features
 

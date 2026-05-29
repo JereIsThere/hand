@@ -1,5 +1,7 @@
 import express from 'express';
 import path from 'path';
+import net from 'net';
+import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
@@ -14,6 +16,12 @@ const {
   ORIENTDB_PASS = '',
   ORIENTDB_DB = 'mydb',
   PORT = 3737,
+  SSH_HOST = '',
+  SSH_USER = '',
+  SSH_PORT = '22',
+  SSH_LOCAL_PORT = '2480',
+  SSH_REMOTE_HOST = 'localhost',
+  SSH_REMOTE_PORT = '2480',
 } = process.env;
 
 const auth = 'Basic ' + Buffer.from(`${ORIENTDB_USER}:${ORIENTDB_PASS}`).toString('base64');
@@ -122,7 +130,95 @@ app.post('/api/query', wrap(async (req) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => {
-  console.log(`\n  🜲  orientdb admin → http://localhost:${PORT}`);
-  console.log(`     proxying → ${ORIENTDB_URL}  (db: ${ORIENTDB_DB})\n`);
-});
+// --- SSH-Tunnel ---------------------------------------------------------
+let sshChild = null;
+let shuttingDown = false;
+
+function probePort(host, port, timeoutMs = 600) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host, port, timeout: timeoutMs }, () => {
+      s.end(); resolve(true);
+    });
+    s.on('error', () => resolve(false));
+    s.on('timeout', () => { s.destroy(); resolve(false); });
+  });
+}
+
+async function waitForPort(host, port, timeoutMs = 10000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await probePort(host, port)) return true;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  return false;
+}
+
+async function startTunnel() {
+  const target = SSH_USER ? `${SSH_USER}@${SSH_HOST}` : SSH_HOST;
+  const localPort = Number(SSH_LOCAL_PORT);
+  const remote = `${SSH_REMOTE_HOST}:${SSH_REMOTE_PORT}`;
+
+  if (await probePort('127.0.0.1', localPort)) {
+    console.log(`  ↪ Port ${localPort} schon offen — überspringe Tunnel (vermutlich manuell schon getunnelt).`);
+    return null;
+  }
+
+  const args = [
+    '-N', '-T',
+    '-o', 'ExitOnForwardFailure=yes',
+    '-o', 'ServerAliveInterval=30',
+    '-o', 'ServerAliveCountMax=3',
+    '-o', 'BatchMode=yes',          // niemals prompten — Key oder Fehler
+    '-o', 'StrictHostKeyChecking=accept-new',
+    '-p', String(SSH_PORT),
+    '-L', `${localPort}:${remote}`,
+    target,
+  ];
+  console.log(`  🔐 SSH-Tunnel  ${target}:${SSH_PORT}  →  localhost:${localPort} → ${remote}`);
+  const child = spawn('ssh', args, { stdio: ['ignore', 'inherit', 'inherit'] });
+
+  child.on('exit', (code, sig) => {
+    sshChild = null;
+    if (!shuttingDown) {
+      console.error(`  ✗ SSH-Tunnel beendet (code=${code}, sig=${sig}). Server fährt runter.`);
+      process.exit(1);
+    }
+  });
+
+  const ready = await waitForPort('127.0.0.1', localPort, 10000);
+  if (!ready) {
+    child.kill();
+    throw new Error(
+      `SSH-Tunnel auf Port ${localPort} kam in 10s nicht hoch. ` +
+      `Checks: ssh-Key für ${target} hinterlegt? Host erreichbar? Port ${localPort} frei?`
+    );
+  }
+  console.log(`  ✓ Tunnel live auf localhost:${localPort}\n`);
+  return child;
+}
+
+function shutdown(sig) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\n  ⤴ ${sig} — fahre runter…`);
+  if (sshChild) try { sshChild.kill(); } catch {}
+  process.exit(0);
+}
+['SIGINT', 'SIGTERM', 'SIGHUP'].forEach(s => process.on(s, () => shutdown(s)));
+
+async function main() {
+  if (SSH_HOST) {
+    try { sshChild = await startTunnel(); }
+    catch (e) {
+      console.error(`  ✗ ${e.message}\n`);
+      process.exit(1);
+    }
+  }
+
+  app.listen(PORT, () => {
+    console.log(`  🜲  orientdb admin → http://localhost:${PORT}`);
+    console.log(`     proxying → ${ORIENTDB_URL}  (db: ${ORIENTDB_DB})\n`);
+  });
+}
+
+main();
