@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>orientdb admin</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='28'%3E%F0%9F%9C%B2%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="sigil">🜲</span>
+      <h1>orientdb admin</h1>
+    </div>
+    <div class="status" id="status">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">verbinde…</span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="schema">Schema</button>
+    <button class="tab" data-tab="records">Records</button>
+    <button class="tab" data-tab="query">Query</button>
+  </nav>
+
+  <main>
+    <section class="panel active" id="panel-schema">
+      <div class="panel-head">
+        <h2>Klassen im Schema</h2>
+        <button class="btn ghost" id="reload-schema">↻ neu laden</button>
+      </div>
+      <div id="schema-list" class="schema-list"></div>
+    </section>
+
+    <section class="panel" id="panel-records">
+      <div class="panel-head">
+        <div class="controls">
+          <label>Klasse
+            <select id="records-class"></select>
+          </label>
+          <label>Limit
+            <input type="number" id="records-limit" value="50" min="1" max="500" />
+          </label>
+          <label>Skip
+            <input type="number" id="records-skip" value="0" min="0" />
+          </label>
+          <button class="btn" id="records-load">laden</button>
+          <span class="meta" id="records-meta"></span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="records-table"><thead></thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-query">
+      <div class="panel-head">
+        <div class="controls">
+          <label>Sprache
+            <select id="query-lang">
+              <option value="sql">SQL</option>
+              <option value="gremlin">Gremlin</option>
+            </select>
+          </label>
+          <button class="btn" id="query-run">▶ ausführen <kbd>Ctrl·↩</kbd></button>
+          <button class="btn ghost" id="query-view">JSON / Tabelle</button>
+        </div>
+      </div>
+      <textarea id="query-input" spellcheck="false" placeholder="SELECT FROM V LIMIT 10"></textarea>
+      <div class="table-wrap" id="query-table-wrap">
+        <table id="query-table"><thead></thead><tbody></tbody></table>
+      </div>
+      <pre id="query-json" class="json hidden"></pre>
+    </section>
+  </main>
+
+  <aside class="drawer" id="drawer">
+    <header>
+      <div>
+        <small class="muted">Record</small>
+        <h3 id="drawer-rid">—</h3>
+      </div>
+      <button class="btn ghost" id="drawer-close">✕</button>
+    </header>
+    <div class="drawer-body">
+      <div id="drawer-fields"></div>
+      <details>
+        <summary>Raw JSON</summary>
+        <textarea id="drawer-raw" spellcheck="false"></textarea>
+      </details>
+    </div>
+    <footer>
+      <button class="btn danger" id="drawer-delete">löschen</button>
+      <span class="spacer"></span>
+      <button class="btn" id="drawer-save">speichern</button>
+    </footer>
+  </aside>
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+  <div id="toasts" class="toasts"></div>
+
+  <script type="module" src="app/main.js"></script>
+</body>
+</html>
