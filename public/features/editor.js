@@ -2,23 +2,42 @@ import { api } from '../shared/api.js';
 import { $, el, toast, detectType, isMeta, confirmDanger } from '../shared/ui.js';
 
 let current = null;
+let isNew = false;
 let onChange = null;
+
+const ORIENT_TO_JS = {
+  STRING: 'string', INTEGER: 'number', LONG: 'number', FLOAT: 'number', DOUBLE: 'number',
+  BOOLEAN: 'boolean', DATE: 'string', DATETIME: 'string',
+  EMBEDDED: 'object', EMBEDDEDLIST: 'array', EMBEDDEDMAP: 'object',
+  LINK: 'string', LINKLIST: 'array', LINKMAP: 'object',
+};
+
+function defaultForType(t) {
+  switch (ORIENT_TO_JS[t] || 'string') {
+    case 'number':  return '';
+    case 'boolean': return false;
+    case 'array':   return [];
+    case 'object':  return {};
+    default:        return '';
+  }
+}
 
 function fieldFor(key, value) {
   const t = detectType(value);
-  const ro = isMeta(key);
-  const wrap = el('div', { class: 'field' + (ro ? ' readonly' : '') });
+  const ro = isMeta(key) && !isNew; // bei neu: @class darf nicht editiert werden, ist aber sichtbar
+  const lockMeta = isMeta(key);
+  const wrap = el('div', { class: 'field' + (lockMeta ? ' readonly' : '') });
   wrap.append(el('label', {},
     el('span', {}, key),
     el('span', { class: 'type-tag' }, t),
   ));
 
   if (t === 'object' || t === 'array') {
-    const ta = el('textarea', { 'data-key': key, 'data-type': t, readonly: ro || false },
+    const ta = el('textarea', { 'data-key': key, 'data-type': t, readonly: lockMeta || false },
       JSON.stringify(value, null, 2));
     wrap.append(ta);
   } else if (t === 'boolean') {
-    const sel = el('select', { 'data-key': key, 'data-type': t, disabled: ro || false },
+    const sel = el('select', { 'data-key': key, 'data-type': t, disabled: lockMeta || false },
       el('option', { value: 'true', selected: value === true || undefined }, 'true'),
       el('option', { value: 'false', selected: value === false || undefined }, 'false'),
     );
@@ -28,7 +47,7 @@ function fieldFor(key, value) {
       type: t === 'number' ? 'number' : 'text',
       'data-key': key, 'data-type': t,
       value: value == null ? '' : String(value),
-      readonly: ro || false,
+      readonly: lockMeta || false,
     });
     wrap.append(inp);
   }
@@ -71,7 +90,9 @@ function collectFromFields() {
 export async function openEditor(rid, refresh) {
   if (!rid) return;
   onChange = refresh;
+  isNew = false;
   $('#drawer-rid').textContent = rid;
+  $('#drawer-delete').classList.remove('hidden');
   $('#drawer-fields').replaceChildren(el('div', { class: 'cls-super' }, 'lade…'));
   $('#drawer').classList.add('open');
   $('#drawer-backdrop').classList.add('open');
@@ -84,10 +105,30 @@ export async function openEditor(rid, refresh) {
   }
 }
 
+export function openEditorForNew(className, classDef, refresh) {
+  if (!className) return;
+  onChange = refresh;
+  isNew = true;
+  $('#drawer-rid').textContent = `neu · ${className}`;
+  $('#drawer-delete').classList.add('hidden');
+  $('#drawer').classList.add('open');
+  $('#drawer-backdrop').classList.add('open');
+
+  const doc = { '@class': className };
+  const props = classDef?.properties || [];
+  // pre-fill defined properties so user has a form right away
+  for (const p of props) {
+    doc[p.name] = defaultForType(p.type);
+  }
+  current = doc;
+  buildFields(doc);
+}
+
 export function closeEditor() {
   $('#drawer').classList.remove('open');
   $('#drawer-backdrop').classList.remove('open');
   current = null;
+  isNew = false;
 }
 
 export function initEditor() {
@@ -99,24 +140,30 @@ export function initEditor() {
     let doc;
     try {
       const raw = $('#drawer-raw').value.trim();
-      const useRaw = raw && raw !== JSON.stringify(current, null, 2);
+      const baseline = JSON.stringify(current, null, 2);
+      const useRaw = raw && raw !== baseline;
       doc = useRaw ? JSON.parse(raw) : collectFromFields();
     } catch (e) {
       toast(e.message, 'fail');
       return;
     }
     try {
-      await api.update(current['@rid'], doc);
-      toast('gespeichert', 'ok');
+      if (isNew) {
+        const created = await api.create(doc);
+        toast(`angelegt: ${created['@rid'] || ''}`, 'ok');
+      } else {
+        await api.update(current['@rid'], doc);
+        toast('gespeichert', 'ok');
+      }
       onChange?.();
       closeEditor();
     } catch (e) {
-      toast(`Speichern fehlgeschlagen: ${e.message}`, 'fail');
+      toast(`${isNew ? 'Anlegen' : 'Speichern'} fehlgeschlagen: ${e.message}`, 'fail');
     }
   });
 
   $('#drawer-delete').addEventListener('click', async () => {
-    if (!current) return;
+    if (!current || isNew) return;
     if (!confirmDanger(`Record ${current['@rid']} wirklich löschen?`)) return;
     try {
       await api.remove(current['@rid']);

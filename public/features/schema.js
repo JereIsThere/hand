@@ -18,11 +18,13 @@ function propRow(p) {
   );
 }
 
-function renderCard(cls) {
+function renderCard(cls, handlers) {
   const kind = classKind(cls);
   const supers = (cls.superClasses || []).concat(cls.superClass ? [cls.superClass] : []).filter(Boolean);
   const props = cls.properties || [];
   const indexes = cls.indexes || [];
+
+  const stop = (handler) => (e) => { e.preventDefault(); e.stopPropagation(); handler(cls); };
 
   return el('details', { class: 'schema-card' },
     el('summary', {},
@@ -30,6 +32,14 @@ function renderCard(cls) {
       el('span', { class: 'cls-name' }, cls.name),
       supers.length ? el('span', { class: 'cls-super' }, '⟵ ' + supers.join(', ')) : null,
       el('span', { class: 'cls-count' }, `${cls.records ?? '?'} records · ${props.length} props`),
+      handlers?.onSelectClass && el('button', {
+        class: 'btn ghost card-action', title: 'Records dieser Klasse öffnen',
+        onclick: stop(c => handlers.onSelectClass(c.name)),
+      }, 'Records →'),
+      handlers?.onNewEntry && el('button', {
+        class: 'btn card-action', title: 'Neuen Eintrag in dieser Klasse anlegen',
+        onclick: stop(c => handlers.onNewEntry(c)),
+      }, '+ Eintrag'),
     ),
     el('div', { class: 'schema-body' },
       el('h4', {}, 'Properties'),
@@ -61,7 +71,7 @@ function renderCard(cls) {
   );
 }
 
-export async function loadSchema() {
+export async function loadSchema(handlers = {}) {
   const target = $('#schema-list');
   target.replaceChildren(el('div', { class: 'cls-super' }, 'lade Schema…'));
   try {
@@ -71,7 +81,7 @@ export async function loadSchema() {
       if (ak !== bk) return ak === 'V' ? -1 : bk === 'V' ? 1 : ak === 'E' ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
-    target.replaceChildren(...sorted.map(renderCard));
+    target.replaceChildren(...sorted.map(c => renderCard(c, handlers)));
     return sorted;
   } catch (e) {
     target.replaceChildren(el('div', { class: 'cls-super' }, `Fehler: ${e.message}`));
