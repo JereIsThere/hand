@@ -16,6 +16,26 @@ npm start
 
 Aufruf: <http://localhost:3737>
 
+## Windows-Integration
+
+Einmal-Setup für Startmenü-Verknüpfung:
+
+```powershell
+# im Repo-Root
+.\scripts\install.ps1            # legt "OrientDB Admin" im Startmenü an
+.\scripts\install.ps1 -Desktop   # zusätzlich Verknüpfung auf dem Desktop
+```
+
+Der Installer prüft Node, läuft bei Bedarf `npm install`, kopiert `.env.example` → `.env` falls nötig, und legt eine `.lnk` an, die auf `scripts\start.cmd` zeigt. Doppelklick auf die Verknüpfung startet den Server (mit dem SSH-Tunnel, wenn in `.env` konfiguriert) und öffnet den Browser auf <http://localhost:3737>.
+
+Wieder weg:
+
+```powershell
+.\scripts\uninstall.ps1
+```
+
+Falls Windows die `.ps1` blockiert: `powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1`.
+
 ## SSH-Tunnel zur Prod-OrientDB
 
 ```bash
