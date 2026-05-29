@@ -29,7 +29,10 @@
     <section class="panel active" id="panel-schema">
       <div class="panel-head">
         <h2>Klassen im Schema</h2>
-        <button class="btn ghost" id="reload-schema">↻ neu laden</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" id="open-wizard">+ Neue Klasse</button>
+          <button class="btn ghost" id="reload-schema">↻ neu laden</button>
+        </div>
       </div>
       <div id="schema-list" class="schema-list"></div>
     </section>
@@ -98,6 +101,86 @@
     </footer>
   </aside>
   <div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+  <div class="wizard" id="wizard" aria-hidden="true">
+    <div class="wizard-shell">
+      <header class="wizard-head">
+        <div>
+          <small class="muted">Neue Klasse</small>
+          <h3 id="wizard-title">Schritt 1 · Basics</h3>
+        </div>
+        <div class="wizard-steps">
+          <span class="step active" data-step="1">1</span>
+          <span class="step" data-step="2">2</span>
+          <span class="step" data-step="3">3</span>
+          <span class="step" data-step="4">4</span>
+        </div>
+        <button class="btn ghost" id="wizard-close">✕</button>
+      </header>
+
+      <div class="wizard-body">
+        <section class="wizard-step active" data-step="1">
+          <div class="field">
+            <label><span>Klassen-Name</span><span class="type-tag">identifier</span></label>
+            <input id="wiz-name" type="text" placeholder="z.B. Sprecher" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label><span>Art</span></label>
+            <select id="wiz-kind">
+              <option value="V">Vertex (V)</option>
+              <option value="E">Edge (E)</option>
+              <option value="">Document (keine Superklasse)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label><span>Zusätzliche Superklasse</span><span class="type-tag">optional</span></label>
+            <select id="wiz-super"><option value="">— keine —</option></select>
+          </div>
+        </section>
+
+        <section class="wizard-step" data-step="2">
+          <p class="muted small">Eine Zeile pro Property. Type ist Pflicht, Name muss `[A-Za-z0-9_]` sein.</p>
+          <div class="table-wrap thin">
+            <table id="wiz-props">
+              <thead><tr>
+                <th>Name</th><th>Type</th>
+                <th title="Mandatory">M</th>
+                <th title="NotNull">N</th>
+                <th></th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button class="btn ghost" id="wiz-add-prop">+ Property</button>
+        </section>
+
+        <section class="wizard-step" data-step="3">
+          <p class="muted small">Optionale Erst-Datensätze. Leere Zellen werden ignoriert. Typen werden beim INSERT gemäß Property-Definition konvertiert.</p>
+          <div class="table-wrap thin">
+            <table id="wiz-rows">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button class="btn ghost" id="wiz-add-row">+ Zeile</button>
+        </section>
+
+        <section class="wizard-step" data-step="4">
+          <p class="muted small">Vorschau der SQL-Statements. Wird sequenziell ausgeführt — bei Fehler bricht der Wizard ab und zeigt was noch nicht passiert ist.</p>
+          <pre id="wiz-preview" class="json"></pre>
+          <div id="wiz-progress"></div>
+        </section>
+      </div>
+
+      <footer class="wizard-foot">
+        <button class="btn ghost" id="wiz-prev">← zurück</button>
+        <span class="spacer"></span>
+        <button class="btn" id="wiz-next">weiter →</button>
+        <button class="btn hidden" id="wiz-run">▶ Klasse anlegen</button>
+      </footer>
+    </div>
+    <div class="wizard-backdrop" id="wizard-backdrop"></div>
+  </div>
 
   <div id="toasts" class="toasts"></div>
 

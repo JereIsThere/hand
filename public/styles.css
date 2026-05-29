@@ -281,6 +281,76 @@ tbody tr:hover { background: var(--surface-2); }
 .field.readonly input { background: var(--surface-2); color: var(--muted); }
 #drawer-raw { width: 100%; min-height: 200px; font-family: var(--mono); font-size: 12px; }
 
+/* wizard */
+.wizard {
+  position: fixed; inset: 0; z-index: 60;
+  display: none; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.wizard.open { display: flex; }
+.wizard-backdrop {
+  position: absolute; inset: 0; background: rgba(58,47,31,.35);
+  backdrop-filter: blur(2px);
+}
+.wizard-shell {
+  position: relative; z-index: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 30px 80px -30px rgba(58,47,31,.4);
+  width: min(820px, 100%);
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.wizard-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--line);
+  gap: 16px;
+}
+.wizard-head h3 { font-family: var(--serif); margin: 0; font-size: 17px; }
+.wizard-head small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .8px; }
+.wizard-steps { display: flex; gap: 6px; }
+.wizard-steps .step {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface-2); color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px;
+  border: 1px solid var(--line);
+}
+.wizard-steps .step.active { background: var(--amber); color: #fff7e6; border-color: var(--amber); }
+.wizard-steps .step.done   { background: var(--green); color: #fff; border-color: var(--green); }
+.wizard-body { flex: 1; overflow: auto; padding: 18px 20px; }
+.wizard-step { display: none; }
+.wizard-step.active { display: block; }
+.wizard-foot {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 20px; border-top: 1px solid var(--line); background: var(--surface-2);
+}
+.table-wrap.thin { max-height: 320px; box-shadow: none; }
+.table-wrap.thin table { font-size: 12px; }
+.table-wrap.thin td { padding: 4px 6px; white-space: normal; max-width: none; }
+.table-wrap.thin td input, .table-wrap.thin td select {
+  width: 100%; padding: 4px 6px; font-size: 12px;
+  background: transparent; border: 1px solid transparent;
+}
+.table-wrap.thin td input:focus, .table-wrap.thin td select:focus {
+  background: var(--surface); border-color: var(--amber);
+}
+.table-wrap.thin td.check { text-align: center; width: 32px; }
+.table-wrap.thin td.actions { width: 28px; text-align: center; }
+.table-wrap.thin .row-del {
+  background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px;
+}
+.table-wrap.thin .row-del:hover { color: var(--red); }
+.small { font-size: 12px; }
+#wiz-progress { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 12px; }
+#wiz-progress .step-line { display: flex; gap: 8px; align-items: center; }
+#wiz-progress .step-line.ok::before  { content: "✓"; color: var(--green); }
+#wiz-progress .step-line.err::before { content: "✗"; color: var(--red); }
+#wiz-progress .step-line.run::before { content: "…"; color: var(--amber); }
+#wiz-progress .step-line.pending::before { content: "·"; color: var(--muted); }
+
 /* toasts */
 .toasts {
   position: fixed; bottom: 18px; right: 18px;

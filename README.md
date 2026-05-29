@@ -26,7 +26,7 @@ Solange der Tunnel offen ist, zeigt `ORIENTDB_URL=http://localhost:2480` auf die
 
 ## Features
 
-- **Schema** — alle V/E-Klassen mit Properties und Indexes, aufklappbar.
+- **Schema** — alle V/E-Klassen mit Properties und Indexes, aufklappbar. `+ Neue Klasse` öffnet einen 4-Step-Wizard (Basics → Properties → Erst-Datensätze → SQL-Vorschau), der die Statements sequenziell ausführt und bei Fehlern abbricht.
 - **Records** — pro Klasse, Paging via Skip/Limit. Zeile anklicken öffnet den Editor.
 - **Editor (Drawer)** — typisierte Felder oder roher JSON-Modus, Save/Delete.
 - **Query** — SQL (default) oder Gremlin, Ergebnis als Tabelle oder JSON. <kbd>Ctrl·↵</kbd> führt aus.

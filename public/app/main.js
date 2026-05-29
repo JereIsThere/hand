@@ -4,6 +4,7 @@ import { loadSchema } from '../features/schema.js';
 import { setRecordsClasses, loadRecords } from '../features/records.js';
 import { initEditor } from '../features/editor.js';
 import { initQuery } from '../features/query.js';
+import { initWizard, openWizard } from '../features/class-wizard.js';
 
 function switchTab(name) {
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
@@ -27,9 +28,12 @@ async function probeConnection() {
   }
 }
 
+let lastClasses = [];
+
 async function bootstrap() {
   initEditor();
   initQuery();
+  initWizard();
 
   $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
   const initial = (location.hash || '#schema').slice(1);
@@ -38,6 +42,7 @@ async function bootstrap() {
   $('#reload-schema').addEventListener('click', refresh);
   $('#records-load').addEventListener('click', () => loadRecords(true));
   $('#records-class').addEventListener('change', () => loadRecords(true));
+  $('#open-wizard').addEventListener('click', () => openWizard(lastClasses, refresh));
 
   await probeConnection();
   await refresh();
@@ -45,6 +50,7 @@ async function bootstrap() {
 
 async function refresh() {
   const classes = await loadSchema();
+  lastClasses = classes;
   setRecordsClasses(classes);
 }
 
