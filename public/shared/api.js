@@ -19,6 +19,11 @@ export const api = {
   },
   count:   (cls)    => fetch(`/api/count?class=${encodeURIComponent(cls)}`).then(json),
   get:     (rid)    => fetch(`/api/record/${encodeURIComponent(rid.replace(/^#/, ''))}`).then(json),
+  create:  (doc)    => fetch('/api/record', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(doc),
+  }).then(json),
   update:  (rid, doc) => fetch(`/api/record/${encodeURIComponent(rid.replace(/^#/, ''))}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

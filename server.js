@@ -100,6 +100,17 @@ app.get('/api/record/:rid', wrap(async (req) => {
   return await odb(`/document/${ORIENTDB_DB}/${safeRid(req.params.rid)}`);
 }));
 
+app.post('/api/record', wrap(async (req) => {
+  const doc = req.body || {};
+  if (!doc['@class'] || !safeIdent(doc['@class'])) {
+    throw Object.assign(new Error('@class (gültiger Identifier) erforderlich'), { status: 400 });
+  }
+  return await odb(`/document/${ORIENTDB_DB}`, {
+    method: 'POST',
+    body: JSON.stringify(doc),
+  });
+}));
+
 app.put('/api/record/:rid', wrap(async (req) => {
   const rid = safeRid(req.params.rid);
   return await odb(`/document/${ORIENTDB_DB}/${rid}`, {

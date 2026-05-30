@@ -30,8 +30,8 @@ ssh -L 2480:localhost:2480 deploy@<prod-host>
 
 ## Features
 
-- **Schema** — alle V/E-Klassen mit Properties und Indexes, aufklappbar. `+ Neue Klasse` öffnet einen 4-Step-Wizard (Basics → Properties → Erst-Datensätze → SQL-Vorschau), der die Statements sequenziell ausführt und bei Fehlern abbricht.
-- **Records** — pro Klasse, Paging via Skip/Limit. Zeile anklicken öffnet den Editor.
+- **Schema** — alle V/E-Klassen mit Properties und Indexes, aufklappbar. Pro Klasse zwei Quick-Actions: `Records →` springt direkt zur gefilterten Liste, `+ Eintrag` öffnet den Editor mit vorgefüllten Property-Feldern. `+ Neue Klasse` öffnet einen 4-Step-Wizard (Basics → Properties → Erst-Datensätze → SQL-Vorschau), der die Statements sequenziell ausführt und bei Fehlern abbricht.
+- **Records** — pro Klasse, Paging via Skip/Limit, `+ Neuer Eintrag` Button. Zeile anklicken öffnet den Editor.
 - **Editor (Drawer)** — typisierte Felder oder roher JSON-Modus, Save/Delete.
 - **Query** — SQL (default) oder Gremlin, Ergebnis als Tabelle oder JSON. <kbd>Ctrl·↵</kbd> führt aus.
 

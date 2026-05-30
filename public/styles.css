@@ -163,6 +163,10 @@ kbd {
 .schema-card .cls-count {
   margin-left: auto; color: var(--ink-soft); font-family: var(--mono); font-size: 12px;
 }
+.schema-card .card-action {
+  font-size: 11px; padding: 4px 10px; margin-left: 6px;
+}
+.schema-card > summary:hover .card-action.ghost { background: var(--surface); }
 .schema-body { padding: 4px 16px 16px 42px; border-top: 1px solid var(--line-soft); }
 .schema-body h4 {
   font-family: var(--serif); font-size: 13px; margin: 12px 0 6px;
