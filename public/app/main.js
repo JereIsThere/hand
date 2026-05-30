@@ -5,11 +5,28 @@ import { setRecordsClasses, loadRecords } from '../features/records.js';
 import { initEditor, openEditorForNew } from '../features/editor.js';
 import { initQuery } from '../features/query.js';
 import { initWizard, openWizard } from '../features/class-wizard.js';
+import { initTunnels, activateTunnels, deactivateTunnels } from '../tools/tunnels.js';
 
-function switchTab(name) {
-  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  $$('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${name}`));
+// ----------------------------------------------------------------
+// Shell: sidebar tool-switching
+// ----------------------------------------------------------------
+const TOOLS = ['orientdb', 'tunnels'];
+
+function switchTool(name) {
+  if (!TOOLS.includes(name)) name = 'orientdb';
+  $$('.sb-item').forEach(b => b.classList.toggle('active', b.dataset.tool === name));
+  $$('.tool').forEach(t => t.classList.toggle('active', t.id === `tool-${name}`));
   history.replaceState(null, '', `#${name}`);
+  if (name === 'tunnels') activateTunnels();
+  else                    deactivateTunnels();
+}
+
+// ----------------------------------------------------------------
+// OrientDB tool — internal Schema/Records/Query tabs
+// ----------------------------------------------------------------
+function switchTab(name) {
+  $$('#tool-orientdb .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  $$('#tool-orientdb .panel').forEach(p => p.classList.toggle('active', p.id === `panel-${name}`));
 }
 
 async function probeConnection() {
@@ -23,7 +40,7 @@ async function probeConnection() {
   } catch (e) {
     dot.classList.add('fail'); dot.classList.remove('ok');
     text.textContent = 'nicht verbunden';
-    toast(`Verbindung fehlgeschlagen: ${e.message}`, 'fail');
+    toast(`OrientDB: ${e.message}`, 'fail');
     return null;
   }
 }
@@ -46,26 +63,36 @@ function newEntryFor(name) {
   const def = classDefByName(name);
   if (!def) { toast(`Klasse "${name}" unbekannt`, 'fail'); return; }
   openEditorForNew(name, def, () => {
-    // nach dem Anlegen: Records-Tab + Liste der Klasse neu laden, damit der Eintrag sichtbar wird
     if ($('#panel-records').classList.contains('active') && $('#records-class').value === name) {
       loadRecords();
     } else {
       viewRecordsFor(name);
     }
-    refresh();
+    refreshOrientdb();
   });
 }
 
+async function refreshOrientdb() {
+  const classes = await loadSchema({
+    onSelectClass: viewRecordsFor,
+    onNewEntry: (cls) => newEntryFor(cls.name),
+  });
+  lastClasses = classes;
+  setRecordsClasses(classes);
+}
+
+// ----------------------------------------------------------------
+// Bootstrap
+// ----------------------------------------------------------------
 async function bootstrap() {
+  // shared overlays (editor + wizard) initialisieren — sind tool-übergreifend nutzbar
   initEditor();
-  initQuery();
   initWizard();
 
-  $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
-  const initial = (location.hash || '#schema').slice(1);
-  if (['schema', 'records', 'query'].includes(initial)) switchTab(initial);
-
-  $('#reload-schema').addEventListener('click', refresh);
+  // OrientDB-internal listeners
+  initQuery();
+  $$('#tool-orientdb .tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+  $('#reload-schema').addEventListener('click', refreshOrientdb);
   $('#records-load').addEventListener('click', () => loadRecords(true));
   $('#records-class').addEventListener('change', () => loadRecords(true));
   $('#records-new').addEventListener('click', () => {
@@ -73,19 +100,19 @@ async function bootstrap() {
     if (!cls) { toast('Keine Klasse gewählt', 'fail'); return; }
     newEntryFor(cls);
   });
-  $('#open-wizard').addEventListener('click', () => openWizard(lastClasses, refresh));
+  $('#open-wizard').addEventListener('click', () => openWizard(lastClasses, refreshOrientdb));
 
+  // Tunnels-internal listeners
+  initTunnels();
+
+  // Shell-Switching
+  $$('.sb-item').forEach(b => b.addEventListener('click', () => switchTool(b.dataset.tool)));
+  const initialTool = (location.hash || '#orientdb').slice(1);
+  switchTool(initialTool);
+
+  // initial loads
   await probeConnection();
-  await refresh();
-}
-
-async function refresh() {
-  const classes = await loadSchema({
-    onSelectClass: viewRecordsFor,
-    onNewEntry: (cls) => newEntryFor(cls.name),
-  });
-  lastClasses = classes;
-  setRecordsClasses(classes);
+  await refreshOrientdb();
 }
 
 bootstrap();

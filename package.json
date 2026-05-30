@@ -1,9 +1,9 @@
 {
-  "name": "orientdb-admin",
-  "version": "0.1.0",
+  "name": "hand",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Minimal admin tool for OrientDB — schema browser, records, edit, query console.",
+  "description": "Die Hand — Tool-Management-Shell (Slug: hand). Erste Tools: OrientDB-Admin, SSH-Tunnel-Manager.",
   "engines": { "node": ">=18" },
   "scripts": {
     "start": "node server.js",
