@@ -1,6 +1,6 @@
-# hand ✋
+# Die Hand ✋
 
-Tool-Management-Shell. Sidebar links, ein Tool pro Tab.
+Tool-Management-Shell (Repo-Slug: `hand`). Sidebar links, ein Tool pro Tab.
 
 Aktuelle Tools:
 
@@ -108,7 +108,7 @@ hand/
 
 ## Vision
 
-Mittelfristig wird `hand` der Träger für mehr als nur Admin-Tooling:
+Mittelfristig wird *Die Hand* der Träger für mehr als nur Admin-Tooling:
 
-- **Auge-Submissions:** Eine User-Variante (read-only Shell) lässt Leute Themen-Requests für [auge](https://github.com/JereIsThere/auge) submitten. Die Admin-Hand (also dieses Repo) genehmigt; in n8n laufen dann die Build-Workflows.
+- **Auge-Submissions:** Eine User-Variante (read-only Shell) lässt Leute Themen-Requests für [auge](https://github.com/JereIsThere/auge) submitten. *Die Hand* (also dieses Repo, die Admin-Seite) genehmigt; in n8n laufen dann die Build-Workflows.
 - Weitere Tools (Postgres, n8n-Trigger, Log-Viewer, …) kommen als zusätzliche Sidebar-Items.

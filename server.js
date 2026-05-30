@@ -436,7 +436,7 @@ async function main() {
   }
 
   app.listen(PORT, () => {
-    console.log(`  hand  -> http://localhost:${PORT}`);
+    console.log(`  Die Hand  -> http://localhost:${PORT}`);
     console.log(`        OrientDB-Proxy -> ${ORIENTDB_URL}  (db: ${ORIENTDB_DB})`);
     console.log(`        Tunnels: ${tunnels.list().length} konfiguriert\n`);
   });
