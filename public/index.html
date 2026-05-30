@@ -3,83 +3,159 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>orientdb admin</title>
+  <title>hand</title>
   <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='28'%3E%F0%9F%9C%B2%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%8B%3C/text%3E%3C/svg%3E" />
 </head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="sigil">🜲</span>
-      <h1>orientdb admin</h1>
+<body class="shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="sigil">✋</span>
+      <div>
+        <div class="brand-label">hand</div>
+        <div class="brand-tag">tool-management</div>
+      </div>
     </div>
-    <div class="status" id="status">
-      <span class="dot" id="status-dot"></span>
-      <span id="status-text">verbinde…</span>
+    <nav class="sidebar-nav">
+      <button class="sb-item active" data-tool="orientdb">
+        <span class="sb-icon">🜲</span>
+        <span class="sb-label">OrientDB</span>
+      </button>
+      <button class="sb-item" data-tool="tunnels">
+        <span class="sb-icon">🔐</span>
+        <span class="sb-label">SSH-Tunnel</span>
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      <small class="muted">v0.2 · localhost:3737</small>
     </div>
-  </header>
+  </aside>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="schema">Schema</button>
-    <button class="tab" data-tab="records">Records</button>
-    <button class="tab" data-tab="query">Query</button>
-  </nav>
+  <main class="tool-stage">
 
-  <main>
-    <section class="panel active" id="panel-schema">
-      <div class="panel-head">
-        <h2>Klassen im Schema</h2>
-        <div style="display:flex; gap:8px;">
-          <button class="btn" id="open-wizard">+ Neue Klasse</button>
-          <button class="btn ghost" id="reload-schema">↻ neu laden</button>
+    <!-- =========================================================
+         TOOL · OrientDB
+         ========================================================= -->
+    <section class="tool active" id="tool-orientdb">
+      <header class="topbar">
+        <div class="brand"><h1>OrientDB</h1></div>
+        <div class="status" id="status">
+          <span class="dot" id="status-dot"></span>
+          <span id="status-text">verbinde…</span>
         </div>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="schema">Schema</button>
+        <button class="tab" data-tab="records">Records</button>
+        <button class="tab" data-tab="query">Query</button>
+      </nav>
+
+      <div class="tool-body">
+        <section class="panel active" id="panel-schema">
+          <div class="panel-head">
+            <h2>Klassen im Schema</h2>
+            <div style="display:flex; gap:8px;">
+              <button class="btn" id="open-wizard">+ Neue Klasse</button>
+              <button class="btn ghost" id="reload-schema">↻ neu laden</button>
+            </div>
+          </div>
+          <div id="schema-list" class="schema-list"></div>
+        </section>
+
+        <section class="panel" id="panel-records">
+          <div class="panel-head">
+            <div class="controls">
+              <label>Klasse
+                <select id="records-class"></select>
+              </label>
+              <label>Limit
+                <input type="number" id="records-limit" value="50" min="1" max="500" />
+              </label>
+              <label>Skip
+                <input type="number" id="records-skip" value="0" min="0" />
+              </label>
+              <button class="btn" id="records-load">laden</button>
+              <button class="btn" id="records-new" title="Neuen Eintrag in der gewählten Klasse anlegen">+ Neuer Eintrag</button>
+              <span class="meta" id="records-meta"></span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="records-table"><thead></thead><tbody></tbody></table>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-query">
+          <div class="panel-head">
+            <div class="controls">
+              <label>Sprache
+                <select id="query-lang">
+                  <option value="sql">SQL</option>
+                  <option value="gremlin">Gremlin</option>
+                </select>
+              </label>
+              <button class="btn" id="query-run">▶ ausführen <kbd>Ctrl·↩</kbd></button>
+              <button class="btn ghost" id="query-view">JSON / Tabelle</button>
+            </div>
+          </div>
+          <textarea id="query-input" spellcheck="false" placeholder="SELECT FROM V LIMIT 10"></textarea>
+          <div class="table-wrap" id="query-table-wrap">
+            <table id="query-table"><thead></thead><tbody></tbody></table>
+          </div>
+          <pre id="query-json" class="json hidden"></pre>
+        </section>
       </div>
-      <div id="schema-list" class="schema-list"></div>
     </section>
 
-    <section class="panel" id="panel-records">
-      <div class="panel-head">
-        <div class="controls">
-          <label>Klasse
-            <select id="records-class"></select>
-          </label>
-          <label>Limit
-            <input type="number" id="records-limit" value="50" min="1" max="500" />
-          </label>
-          <label>Skip
-            <input type="number" id="records-skip" value="0" min="0" />
-          </label>
-          <button class="btn" id="records-load">laden</button>
-          <button class="btn" id="records-new" title="Neuen Eintrag in der gewählten Klasse anlegen">+ Neuer Eintrag</button>
-          <span class="meta" id="records-meta"></span>
+    <!-- =========================================================
+         TOOL · SSH-Tunnel
+         ========================================================= -->
+    <section class="tool" id="tool-tunnels">
+      <header class="topbar">
+        <div class="brand"><h1>SSH-Tunnel</h1></div>
+        <div class="status">
+          <span class="dot" id="tunnels-dot"></span>
+          <span id="tunnels-status-text">—</span>
         </div>
-      </div>
-      <div class="table-wrap">
-        <table id="records-table"><thead></thead><tbody></tbody></table>
+      </header>
+
+      <div class="tool-body">
+        <div class="panel-head">
+          <h2>Konfigurierte Tunnel</h2>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" id="tunnel-new">+ Tunnel</button>
+            <button class="btn ghost" id="tunnels-reload">↻ neu laden</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="tunnels-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Name</th>
+                <th>Target</th>
+                <th>Forward</th>
+                <th>Status</th>
+                <th>Quelle</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <details class="tunnels-log-wrap">
+          <summary>Log des gewählten Tunnels</summary>
+          <pre id="tunnel-log" class="json"></pre>
+        </details>
       </div>
     </section>
 
-    <section class="panel" id="panel-query">
-      <div class="panel-head">
-        <div class="controls">
-          <label>Sprache
-            <select id="query-lang">
-              <option value="sql">SQL</option>
-              <option value="gremlin">Gremlin</option>
-            </select>
-          </label>
-          <button class="btn" id="query-run">▶ ausführen <kbd>Ctrl·↩</kbd></button>
-          <button class="btn ghost" id="query-view">JSON / Tabelle</button>
-        </div>
-      </div>
-      <textarea id="query-input" spellcheck="false" placeholder="SELECT FROM V LIMIT 10"></textarea>
-      <div class="table-wrap" id="query-table-wrap">
-        <table id="query-table"><thead></thead><tbody></tbody></table>
-      </div>
-      <pre id="query-json" class="json hidden"></pre>
-    </section>
   </main>
 
+  <!-- =========================================================
+       Shared overlays (OrientDB-Editor-Drawer + Klassen-Wizard)
+       ========================================================= -->
   <aside class="drawer" id="drawer">
     <header>
       <div>
@@ -118,61 +194,42 @@
         </div>
         <button class="btn ghost" id="wizard-close">✕</button>
       </header>
-
       <div class="wizard-body">
         <section class="wizard-step active" data-step="1">
-          <div class="field">
-            <label><span>Klassen-Name</span><span class="type-tag">identifier</span></label>
-            <input id="wiz-name" type="text" placeholder="z.B. Sprecher" autocomplete="off" />
-          </div>
-          <div class="field">
-            <label><span>Art</span></label>
+          <div class="field"><label><span>Klassen-Name</span><span class="type-tag">identifier</span></label>
+            <input id="wiz-name" type="text" placeholder="z.B. Sprecher" autocomplete="off" /></div>
+          <div class="field"><label><span>Art</span></label>
             <select id="wiz-kind">
               <option value="V">Vertex (V)</option>
               <option value="E">Edge (E)</option>
               <option value="">Document (keine Superklasse)</option>
-            </select>
-          </div>
-          <div class="field">
-            <label><span>Zusätzliche Superklasse</span><span class="type-tag">optional</span></label>
-            <select id="wiz-super"><option value="">— keine —</option></select>
-          </div>
+            </select></div>
+          <div class="field"><label><span>Zusätzliche Superklasse</span><span class="type-tag">optional</span></label>
+            <select id="wiz-super"><option value="">— keine —</option></select></div>
         </section>
-
         <section class="wizard-step" data-step="2">
           <p class="muted small">Eine Zeile pro Property. Type ist Pflicht, Name muss `[A-Za-z0-9_]` sein.</p>
           <div class="table-wrap thin">
             <table id="wiz-props">
-              <thead><tr>
-                <th>Name</th><th>Type</th>
-                <th title="Mandatory">M</th>
-                <th title="NotNull">N</th>
-                <th></th>
-              </tr></thead>
+              <thead><tr><th>Name</th><th>Type</th><th title="Mandatory">M</th><th title="NotNull">N</th><th></th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
           <button class="btn ghost" id="wiz-add-prop">+ Property</button>
         </section>
-
         <section class="wizard-step" data-step="3">
           <p class="muted small">Optionale Erst-Datensätze. Leere Zellen werden ignoriert. Typen werden beim INSERT gemäß Property-Definition konvertiert.</p>
           <div class="table-wrap thin">
-            <table id="wiz-rows">
-              <thead><tr></tr></thead>
-              <tbody></tbody>
-            </table>
+            <table id="wiz-rows"><thead><tr></tr></thead><tbody></tbody></table>
           </div>
           <button class="btn ghost" id="wiz-add-row">+ Zeile</button>
         </section>
-
         <section class="wizard-step" data-step="4">
           <p class="muted small">Vorschau der SQL-Statements. Wird sequenziell ausgeführt — bei Fehler bricht der Wizard ab und zeigt was noch nicht passiert ist.</p>
           <pre id="wiz-preview" class="json"></pre>
           <div id="wiz-progress"></div>
         </section>
       </div>
-
       <footer class="wizard-foot">
         <button class="btn ghost" id="wiz-prev">← zurück</button>
         <span class="spacer"></span>
@@ -181,6 +238,43 @@
       </footer>
     </div>
     <div class="wizard-backdrop" id="wizard-backdrop"></div>
+  </div>
+
+  <!-- Tunnel-Mini-Modal -->
+  <div class="wizard" id="tunnel-modal" aria-hidden="true">
+    <div class="wizard-shell" style="width: min(520px, 100%);">
+      <header class="wizard-head">
+        <div>
+          <small class="muted">Tunnel</small>
+          <h3 id="tunnel-modal-title">Neuer Tunnel</h3>
+        </div>
+        <button class="btn ghost" id="tunnel-modal-close">✕</button>
+      </header>
+      <div class="wizard-body">
+        <div class="field"><label><span>Name</span><span class="type-tag">Anzeige</span></label>
+          <input id="tm-name" placeholder="z.B. Postgres-Prod" /></div>
+        <div class="field"><label><span>Host</span></label>
+          <input id="tm-host" placeholder="prod.example.com" /></div>
+        <div class="field"><label><span>User</span><span class="type-tag">optional</span></label>
+          <input id="tm-user" placeholder="deploy" /></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+          <div class="field"><label><span>SSH-Port</span></label>
+            <input id="tm-port" type="number" value="22" /></div>
+          <div class="field"><label><span>Local-Port</span></label>
+            <input id="tm-local" type="number" placeholder="5432" /></div>
+          <div class="field"><label><span>Remote-Port</span></label>
+            <input id="tm-remote" type="number" placeholder="5432" /></div>
+        </div>
+        <div class="field"><label><span>Remote-Host</span><span class="type-tag">Sicht der Ziel-Maschine</span></label>
+          <input id="tm-remotehost" value="localhost" /></div>
+      </div>
+      <footer class="wizard-foot">
+        <button class="btn ghost" id="tunnel-modal-cancel">abbrechen</button>
+        <span class="spacer"></span>
+        <button class="btn" id="tunnel-modal-save">speichern</button>
+      </footer>
+    </div>
+    <div class="wizard-backdrop" id="tunnel-modal-backdrop"></div>
   </div>
 
   <div id="toasts" class="toasts"></div>

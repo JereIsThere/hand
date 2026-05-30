@@ -1,16 +1,20 @@
-# orientdb-admin 🜲
+# hand ✋
 
-Schlankes Admin-Tool für OrientDB — Schema browsen, Records anschauen/editieren/löschen, SQL- und Gremlin-Queries laufen lassen.
+Tool-Management-Shell. Sidebar links, ein Tool pro Tab.
 
-Gedacht für den Workflow: **SSH-Tunnel zur Prod-Maschine → lokal im Browser öffnen**. Credentials liegen in `.env` und gehen nie ins Frontend.
+Aktuelle Tools:
+
+- **OrientDB** — Schema-Browser, Records-Tabelle, Editor (typisiert + Raw-JSON), Klassen-Wizard, SQL/Gremlin-Konsole. (war früher als eigenständiges `orientdb-admin` unterwegs, wurde in `hand` reingezogen)
+- **SSH-Tunnel** — Tunnel-Manager. Der für OrientDB ist aus `.env` als „managed" vorkonfiguriert (auto-startet beim Server-Boot). Weitere Tunnel kommen über die UI dazu (persistiert in `tunnels.json`).
 
 ## Setup
 
 ```bash
-cd orientdb-admin
+git clone https://github.com/JereIsThere/hand.git
+cd hand
 npm install
 cp .env.example .env
-# .env editieren: ORIENTDB_PASS, ORIENTDB_DB anpassen
+# .env editieren: ORIENTDB_PASS, ORIENTDB_DB und ggf. SSH_HOST=<prod-host>
 npm start
 ```
 
@@ -18,77 +22,93 @@ Aufruf: <http://localhost:3737>
 
 ## Windows-Integration
 
-Einmal-Setup für Startmenü-Verknüpfung:
-
 ```powershell
-# im Repo-Root
-.\scripts\install.ps1            # legt "OrientDB Admin" im Startmenü an
-.\scripts\install.ps1 -Desktop   # zusätzlich Verknüpfung auf dem Desktop
+.\scripts\install.ps1            # legt "OrientDB Admin" (TODO: umbenennen zu "hand") im Startmenü an
+.\scripts\install.ps1 -Desktop   # zusätzlich Desktop-Verknüpfung
+.\scripts\uninstall.ps1          # entfernt die Verknüpfungen
 ```
 
-Der Installer prüft Node, läuft bei Bedarf `npm install`, kopiert `.env.example` → `.env` falls nötig, und legt eine `.lnk` an, die auf `scripts\start.cmd` zeigt. Doppelklick auf die Verknüpfung startet den Server (mit dem SSH-Tunnel, wenn in `.env` konfiguriert) und öffnet den Browser auf <http://localhost:3737>.
+## SSH-Tunnel
 
-Wieder weg:
+**Empfohlen: automatisch.** Setz in `.env`:
 
-```powershell
-.\scripts\uninstall.ps1
+```
+SSH_HOST=<prod-host>
+SSH_USER=deploy
+SSH_LOCAL_PORT=2480
+SSH_REMOTE_PORT=2480
 ```
 
-Falls Windows die `.ps1` blockiert: `powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1`.
+Der Server öffnet beim Start `ssh -N -L 2480:localhost:2480 deploy@<host>`. `BatchMode=yes` heißt: SSH-Key Pflicht (kein Passwort-Prompt). Wenn der Tunnel im Betrieb stirbt, markiert die UI ihn als `error` — du kannst ihn im SSH-Tunnel-Tab neu starten, ohne den Server neu starten zu müssen.
 
-## SSH-Tunnel zur Prod-OrientDB
+Weitere Tunnel anlegen: SSH-Tunnel-Tab → `+ Tunnel` → Felder ausfüllen → `speichern`. Liegen unter `tunnels.json` (gitignored).
 
-**Empfohlen: automatisch.** Setz in `.env` einfach `SSH_HOST=<prod-host>` (plus `SSH_USER` etc., siehe `.env.example`) — der Server öffnet `ssh -N -L 2480:localhost:2480 <user>@<host>` beim Start selbst und beendet sich, wenn der Tunnel kippt. Voraussetzung: SSH-Key liegt beim Ziel-User (`BatchMode=yes`, kein Passwort-Prompt). Wenn Port 2480 lokal schon offen ist (du tunnelst manuell oder OrientDB läuft lokal), überspringt er den Spawn.
+## API
 
-**Manuell:**
-
-```bash
-ssh -L 2480:localhost:2480 deploy@<prod-host>
-```
-
-`ORIENTDB_URL=http://localhost:2480` zeigt dann auf das lokale Tunnel-Ende.
-
-## Features
-
-- **Schema** — alle V/E-Klassen mit Properties und Indexes, aufklappbar. Pro Klasse zwei Quick-Actions: `Records →` springt direkt zur gefilterten Liste, `+ Eintrag` öffnet den Editor mit vorgefüllten Property-Feldern. `+ Neue Klasse` öffnet einen 4-Step-Wizard (Basics → Properties → Erst-Datensätze → SQL-Vorschau), der die Statements sequenziell ausführt und bei Fehlern abbricht.
-- **Records** — pro Klasse, Paging via Skip/Limit, `+ Neuer Eintrag` Button. Zeile anklicken öffnet den Editor.
-- **Editor (Drawer)** — typisierte Felder oder roher JSON-Modus, Save/Delete.
-- **Query** — SQL (default) oder Gremlin, Ergebnis als Tabelle oder JSON. <kbd>Ctrl·↵</kbd> führt aus.
-
-## Endpoints (Proxy)
+### OrientDB
 
 | Methode | Pfad                  | Was                                   |
 |---------|-----------------------|---------------------------------------|
 | GET     | `/api/info`           | Connection-Test + DB-Info             |
-| GET     | `/api/classes`        | Alle Klassen mit Properties           |
-| GET     | `/api/records?class=` | Records einer Klasse (Skip/Limit)     |
-| GET     | `/api/count?class=`   | `count(*)` einer Klasse               |
-| GET     | `/api/record/:rid`    | Einzelnen Record holen (RID o. `#`)   |
-| PUT     | `/api/record/:rid`    | Record updaten (Body = Doc)           |
-| DELETE  | `/api/record/:rid`    | Record löschen                        |
+| GET     | `/api/classes`        | Klassen + Properties                  |
+| GET     | `/api/records?class=` | SELECT FROM Klasse, paged             |
+| GET     | `/api/count?class=`   | count(*)                              |
+| GET     | `/api/record/:rid`    | Einzelner Record                      |
+| POST    | `/api/record`         | Neuer Record (Body = Doc mit @class)  |
+| PUT     | `/api/record/:rid`    | Update                                |
+| DELETE  | `/api/record/:rid`    | Löschen                               |
 | POST    | `/api/query`          | `{ command, language }` ausführen     |
+
+### Tunnels
+
+| Methode | Pfad                          | Was                                          |
+|---------|-------------------------------|----------------------------------------------|
+| GET     | `/api/tunnels`                | Alle Tunnel inkl. Status                     |
+| POST    | `/api/tunnels`                | Neuer Tunnel (persistiert in tunnels.json)   |
+| PUT     | `/api/tunnels/:id`            | Tunnel-Definition aktualisieren (nur unmanaged, nur wenn gestoppt) |
+| DELETE  | `/api/tunnels/:id`            | Tunnel entfernen (nur unmanaged)             |
+| POST    | `/api/tunnels/:id/start`      | ssh-Prozess spawnen, Port-Probe abwarten     |
+| POST    | `/api/tunnels/:id/stop`       | ssh-Prozess killen                           |
+| GET     | `/api/tunnels/:id/log`        | tail des stdout/stderr (letzte 80 Zeilen)    |
 
 ## Struktur
 
 ```
-orientdb-admin/
-├── server.js              ← Express-Proxy, Basic-Auth, .env
+hand/
+├── server.js
+│   ├── OrientDB-Proxy (Basic-Auth aus .env)
+│   └── TunnelManager (managed via .env + unmanaged via tunnels.json)
+├── scripts/
+│   ├── start.cmd        — Windows-Launcher
+│   ├── install.ps1      — Startmenü-Verknüpfung
+│   └── uninstall.ps1
 ├── public/
-│   ├── index.html
+│   ├── index.html       — Sidebar-Shell mit Tool-Sections
 │   ├── styles.css
-│   ├── app/main.js        ← bootstrap, tabs
-│   ├── features/
-│   │   ├── schema.js      ← Schema browser
-│   │   ├── records.js     ← Tabellenansicht
-│   │   ├── editor.js      ← Drawer-Editor
-│   │   └── query.js       ← Konsole
+│   ├── app/main.js      — Shell + Tool-Switching
+│   ├── tools/
+│   │   └── tunnels.js   — SSH-Tunnel-Tab
+│   ├── features/        — OrientDB-Feature-Slices
+│   │   ├── schema.js
+│   │   ├── records.js
+│   │   ├── editor.js
+│   │   ├── query.js
+│   │   └── class-wizard.js
 │   └── shared/
-│       ├── api.js         ← fetch-Wrapper
-│       └── ui.js          ← DOM-Helper, toast, formatCell
+│       ├── api.js       — OrientDB fetch-Wrapper
+│       └── ui.js        — DOM-Helper, toast
 └── .env.example
 ```
 
 ## Warnungen
 
-- Das Tool lauscht auf `localhost` und nutzt **keine** eigene Auth-Schicht. Nicht öffentlich exposen.
-- `DELETE`/`PUT` machen, was sie sagen — kein Undo. Vor dem Editieren `/api/info` checken.
+- Tool lauscht auf `localhost`, keine eigene Auth-Schicht. Nicht öffentlich exposen.
+- `DELETE`/`PUT` machen ohne Undo was sie sagen.
+- `tunnels.json` enthält Hostnames + User. Bewusst gitignored, aber lokal lesbar.
+
+## Vision
+
+Mittelfristig wird `hand` der Träger für mehr als nur Admin-Tooling:
+
+- **Auge-Submissions:** Eine User-Variante (read-only Shell) lässt Leute Themen-Requests für [auge](https://github.com/JereIsThere/auge) submitten. Die Admin-Hand (also dieses Repo) genehmigt; in n8n laufen dann die Build-Workflows.
+- Weitere Tools (Postgres, n8n-Trigger, Log-Viewer, …) kommen als zusätzliche Sidebar-Items.
