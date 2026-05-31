@@ -32,6 +32,11 @@ Aufruf: <http://localhost:3737>
 .\scripts\uninstall.ps1          # entfernt die Verknüpfungen
 ```
 
+Die Verknüpfung startet `scripts\start.cmd`: Server hoch + die Shell öffnet sich
+in einem **chromelosen App-Fenster** (Edge/Chrome `--app`, sonst Standardbrowser) —
+eigener Taskleisten-Eintrag, fühlt sich wie eine native Desktop-App an
+(`scripts\open-app.ps1`).
+
 ## SSH-Tunnel
 
 **Empfohlen: automatisch.** Setz in `.env`:

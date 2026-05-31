@@ -3,7 +3,7 @@
   "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Die Hand — Tool-Management-Shell (Slug: hand). Erste Tools: OrientDB-Admin, SSH-Tunnel-Manager.",
+  "description": "Die Hand — Tool-Management-Shell (Slug: hand). Tools: OrientDB-Admin, SSH-Tunnel, Auge-Submissions.",
   "engines": { "node": ">=18" },
   "scripts": {
     "start": "node server.js",
