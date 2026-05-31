@@ -8,6 +8,8 @@ Aktuelle Tools:
 - **SSH-Tunnel** — Tunnel-Manager. Der für OrientDB ist aus `.env` als „managed" vorkonfiguriert (auto-startet beim Server-Boot). Weitere Tunnel kommen über die UI dazu (persistiert in `tunnels.json`).
 - **Projects / Funkner** — externe Seiten (`projects.jeremias-groehl.de`, `funkner.jeremias-groehl.de`) eingebettet per iframe, lazy beim ersten Öffnen. Falls die Seite das Einbetten verweigert (X-Frame-Options/CSP), erscheint ein „neuer Tab"-Fallback.
 
+Daneben gibt es **Zettel** (`scripts/zettel/`) — eine eigenständige Windows-Sticky-Note (always-on-top, resizable, WPF via PowerShell), die *nicht* Teil der Web-Shell ist, sondern als nativer Desktop-Begleiter danebenliegt. Siehe `scripts/zettel/README.md`.
+
 ## Setup
 
 ```bash
