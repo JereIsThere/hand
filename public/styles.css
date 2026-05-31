@@ -86,6 +86,12 @@ body.shell {
   box-shadow: inset 3px 0 0 var(--amber);
 }
 .sb-icon { font-size: 16px; width: 20px; text-align: center; }
+.sb-label { flex: 1; }
+.sb-ext { font-size: 11px; color: #8b7a5e; }
+.sb-sep {
+  height: 1px; margin: 8px 12px;
+  background: rgba(245,222,179,.10);
+}
 .sidebar-foot {
   padding: 12px 18px; border-top: 1px solid rgba(245,222,179,.08);
 }
@@ -95,6 +101,23 @@ body.shell {
 .tool { display: none; flex-direction: column; min-height: 100vh; }
 .tool.active { display: flex; }
 .tool-body { padding: 22px; flex: 1; }
+
+/* embed tools (externe Seiten per iframe) */
+.embed-tool.active { display: flex; }
+.embed-actions { display: flex; gap: 8px; align-items: center; }
+.embed-actions .embed-open { text-decoration: none; }
+.embed-frame-wrap { flex: 1; position: relative; background: var(--surface-2); }
+.embed-frame { width: 100%; height: 100%; border: 0; display: block; }
+.embed-frame.hidden { display: none; }
+.embed-blocked {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center; padding: 24px;
+  color: var(--ink-soft);
+}
+.embed-blocked.hidden { display: none; }
+.embed-blocked p { max-width: 360px; margin: 0; }
+.embed-blocked .embed-open { text-decoration: none; }
 
 /* topbar */
 .topbar {

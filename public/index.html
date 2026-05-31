@@ -26,6 +26,17 @@
         <span class="sb-icon">🔐</span>
         <span class="sb-label">SSH-Tunnel</span>
       </button>
+      <div class="sb-sep"></div>
+      <button class="sb-item" data-tool="projects">
+        <span class="sb-icon">📋</span>
+        <span class="sb-label">Projects</span>
+        <span class="sb-ext" title="extern eingebettet">↗</span>
+      </button>
+      <button class="sb-item" data-tool="funkner">
+        <span class="sb-icon">📡</span>
+        <span class="sb-label">Funkner</span>
+        <span class="sb-ext" title="extern eingebettet">↗</span>
+      </button>
     </nav>
     <div class="sidebar-foot">
       <small class="muted">v0.2 · localhost:3737</small>
@@ -148,6 +159,48 @@
           <summary>Log des gewählten Tunnels</summary>
           <pre id="tunnel-log" class="json"></pre>
         </details>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TOOL · Projects (extern eingebettet)
+         ========================================================= -->
+    <section class="tool embed-tool" id="tool-projects"
+             data-embed="https://projects.jeremias-groehl.de" data-title="Projects">
+      <header class="topbar">
+        <div class="brand"><h1>Projects</h1></div>
+        <div class="embed-actions">
+          <button class="btn ghost embed-reload">↻ neu laden</button>
+          <a class="btn embed-open" target="_blank" rel="noopener">↗ neuer Tab</a>
+        </div>
+      </header>
+      <div class="embed-frame-wrap">
+        <div class="embed-blocked hidden">
+          <p>Die Seite verweigert das Einbetten (X-Frame-Options / CSP).</p>
+          <a class="btn embed-open" target="_blank" rel="noopener">In neuem Tab öffnen ↗</a>
+        </div>
+        <iframe class="embed-frame" title="Projects" referrerpolicy="no-referrer"></iframe>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TOOL · Funkner (extern eingebettet)
+         ========================================================= -->
+    <section class="tool embed-tool" id="tool-funkner"
+             data-embed="https://funkner.jeremias-groehl.de" data-title="Funkner">
+      <header class="topbar">
+        <div class="brand"><h1>Funkner</h1></div>
+        <div class="embed-actions">
+          <button class="btn ghost embed-reload">↻ neu laden</button>
+          <a class="btn embed-open" target="_blank" rel="noopener">↗ neuer Tab</a>
+        </div>
+      </header>
+      <div class="embed-frame-wrap">
+        <div class="embed-blocked hidden">
+          <p>Die Seite verweigert das Einbetten (X-Frame-Options / CSP).</p>
+          <a class="btn embed-open" target="_blank" rel="noopener">In neuem Tab öffnen ↗</a>
+        </div>
+        <iframe class="embed-frame" title="Funkner" referrerpolicy="no-referrer"></iframe>
       </div>
     </section>
 

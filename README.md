@@ -6,6 +6,7 @@ Aktuelle Tools:
 
 - **OrientDB** — Schema-Browser, Records-Tabelle, Editor (typisiert + Raw-JSON), Klassen-Wizard, SQL/Gremlin-Konsole. (war früher als eigenständiges `orientdb-admin` unterwegs, wurde in `hand` reingezogen)
 - **SSH-Tunnel** — Tunnel-Manager. Der für OrientDB ist aus `.env` als „managed" vorkonfiguriert (auto-startet beim Server-Boot). Weitere Tunnel kommen über die UI dazu (persistiert in `tunnels.json`).
+- **Projects / Funkner** — externe Seiten (`projects.jeremias-groehl.de`, `funkner.jeremias-groehl.de`) eingebettet per iframe, lazy beim ersten Öffnen. Falls die Seite das Einbetten verweigert (X-Frame-Options/CSP), erscheint ein „neuer Tab"-Fallback.
 
 ## Setup
 
