@@ -26,7 +26,7 @@ Aufruf: <http://localhost:3737>
 ## Windows-Integration
 
 ```powershell
-.\scripts\install.ps1            # legt "OrientDB Admin" (TODO: umbenennen zu "hand") im Startmenü an
+.\scripts\install.ps1            # legt "Die Hand" im Startmenü an
 .\scripts\install.ps1 -Desktop   # zusätzlich Desktop-Verknüpfung
 .\scripts\uninstall.ps1          # entfernt die Verknüpfungen
 ```

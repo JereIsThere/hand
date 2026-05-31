@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Installiert orientdb-admin als Startmenue-Eintrag (idempotent).
+  Installiert Die Hand als Startmenue-Eintrag (idempotent).
 .DESCRIPTION
   Prueft Node.js, laeuft `npm install` wenn noetig, legt .env aus .env.example an
   falls noch keine existiert, und legt eine Startmenue-Verknuepfung an, die auf
@@ -23,11 +23,11 @@ $ErrorActionPreference = 'Stop'
 
 $ProjectRoot   = Split-Path -Parent $PSScriptRoot
 $StartScript   = Join-Path $ProjectRoot 'scripts\start.cmd'
-$ShortcutName  = 'OrientDB Admin.lnk'
+$ShortcutName  = 'Die Hand.lnk'
 $StartMenuDir  = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 
 Write-Host ""
-Write-Host "  orientdb-admin -> Windows-Installer" -ForegroundColor Cyan
+Write-Host "  Die Hand -> Windows-Installer" -ForegroundColor Cyan
 Write-Host "      Projektpfad: $ProjectRoot"
 Write-Host ""
 
@@ -80,7 +80,7 @@ function New-AdminShortcut {
   $Shortcut.WorkingDirectory = $ProjectRoot
   # Datenbank-Icon aus shell32.dll (Windows-Bordmittel)
   $Shortcut.IconLocation     = "$env:SystemRoot\System32\shell32.dll,13"
-  $Shortcut.Description      = 'OrientDB Admin -- Schema, Records, Editor, Query'
+  $Shortcut.Description      = 'Die Hand -- Tool-Management-Shell (OrientDB, SSH-Tunnel)'
   $Shortcut.WindowStyle      = 1  # normal
   $Shortcut.Save()
   Write-Host "  [ok] Verknuepfung: $lnk" -ForegroundColor Green
@@ -92,5 +92,5 @@ if ($Desktop) {
 }
 
 Write-Host ""
-Write-Host "  Fertig. Im Startmenue nach 'OrientDB Admin' suchen oder Win-Taste druecken und tippen." -ForegroundColor Cyan
+Write-Host "  Fertig. Im Startmenue nach 'Die Hand' suchen oder Win-Taste druecken und tippen." -ForegroundColor Cyan
 Write-Host ""
