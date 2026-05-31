@@ -7,6 +7,8 @@ Aktuelle Tools:
 - **OrientDB** — Schema-Browser, Records-Tabelle, Editor (typisiert + Raw-JSON), Klassen-Wizard, SQL/Gremlin-Konsole. (war früher als eigenständiges `orientdb-admin` unterwegs, wurde in `hand` reingezogen)
 - **SSH-Tunnel** — Tunnel-Manager. Der für OrientDB ist aus `.env` als „managed" vorkonfiguriert (auto-startet beim Server-Boot). Weitere Tunnel kommen über die UI dazu (persistiert in `tunnels.json`).
 
+Daneben gibt es **Zettel** (`scripts/zettel/`) — eine eigenständige Windows-Sticky-Note (always-on-top, resizable, WPF via PowerShell), die *nicht* Teil der Web-Shell ist, sondern als nativer Desktop-Begleiter danebenliegt. Siehe `scripts/zettel/README.md`.
+
 ## Setup
 
 ```bash
