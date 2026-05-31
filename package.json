@@ -1,16 +1,50 @@
 {
   "name": "hand",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Die Hand — Tool-Management-Shell (Slug: hand). Tools: OrientDB-Admin, SSH-Tunnel, Auge-Submissions.",
+  "main": "electron/main.mjs",
   "engines": { "node": ">=18" },
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "app": "electron .",
+    "make-icon": "node scripts/make-icon.mjs",
+    "dist": "electron-builder --win nsis",
+    "pack": "electron-builder --dir"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "png-to-ico": "^2.1.8"
+  },
+  "build": {
+    "appId": "de.jeremias-groehl.hand",
+    "productName": "Die Hand",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": [
+      "electron/**",
+      "server.js",
+      "public/**",
+      "package.json"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Die Hand"
+    }
   }
 }
