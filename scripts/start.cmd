@@ -1,12 +1,12 @@
 @echo off
-:: orientdb-admin launcher (Windows)
-:: doppelklickbar -- startet den Server und oeffnet den Browser.
+:: Die Hand -- Launcher (Windows).
+:: Doppelklickbar: startet den Server und oeffnet die App im App-Fenster.
 
-title orientdb admin
+title Die Hand
 cd /d "%~dp0\.."
 
-:: Browser nach kurzem Delay oeffnen, damit Express sicher lauscht
-start "" /B powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 2; Start-Process 'http://localhost:3737'"
+:: App im chromelosen Fenster oeffnen (wartet im Hintergrund auf den Server)
+start "" /B powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0open-app.ps1"
 
 node server.js
 
