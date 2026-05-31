@@ -6,12 +6,13 @@ import { initEditor, openEditorForNew } from '../features/editor.js';
 import { initQuery } from '../features/query.js';
 import { initWizard, openWizard } from '../features/class-wizard.js';
 import { initTunnels, activateTunnels, deactivateTunnels } from '../tools/tunnels.js';
+import { initSubmissions, activateSubmissions, deactivateSubmissions } from '../tools/submissions.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
 
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
 // ----------------------------------------------------------------
-const TOOLS = ['orientdb', 'tunnels', 'projects', 'funkner'];
+const TOOLS = ['orientdb', 'tunnels', 'submissions', 'projects', 'funkner'];
 
 function switchTool(name) {
   if (!TOOLS.includes(name)) name = 'orientdb';
@@ -20,6 +21,8 @@ function switchTool(name) {
   history.replaceState(null, '', `#${name}`);
   if (name === 'tunnels') activateTunnels();
   else                    deactivateTunnels();
+  if (name === 'submissions') activateSubmissions();
+  else                        deactivateSubmissions();
   if (name === 'projects' || name === 'funkner') activateEmbed(name);
 }
 
@@ -106,6 +109,9 @@ async function bootstrap() {
 
   // Tunnels-internal listeners
   initTunnels();
+
+  // Submissions-internal listeners
+  initSubmissions();
 
   // External embed tools
   initEmbeds();

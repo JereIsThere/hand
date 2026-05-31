@@ -26,6 +26,10 @@
         <span class="sb-icon">🔐</span>
         <span class="sb-label">SSH-Tunnel</span>
       </button>
+      <button class="sb-item" data-tool="submissions">
+        <span class="sb-icon">📥</span>
+        <span class="sb-label">Submissions</span>
+      </button>
       <div class="sb-sep"></div>
       <button class="sb-item" data-tool="projects">
         <span class="sb-icon">📋</span>
@@ -39,7 +43,7 @@
       </button>
     </nav>
     <div class="sidebar-foot">
-      <small class="muted">v0.2 · localhost:3737</small>
+      <small class="muted">v0.3 · localhost:3737</small>
     </div>
   </aside>
 
@@ -159,6 +163,54 @@
           <summary>Log des gewählten Tunnels</summary>
           <pre id="tunnel-log" class="json"></pre>
         </details>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TOOL · Auge-Submissions
+         ========================================================= -->
+    <section class="tool" id="tool-submissions">
+      <header class="topbar">
+        <div class="brand"><h1>Auge-Submissions</h1></div>
+        <div class="status">
+          <span class="dot" id="subs-dot"></span>
+          <span id="subs-status-text">—</span>
+        </div>
+      </header>
+
+      <div class="tool-body">
+        <div class="panel-head">
+          <div class="controls">
+            <label>Filter
+              <select id="subs-filter">
+                <option value="">alle</option>
+                <option value="pending" selected>offen (pending)</option>
+                <option value="approved">genehmigt</option>
+                <option value="built">gebaut</option>
+                <option value="rejected">abgelehnt</option>
+              </select>
+            </label>
+            <button class="btn ghost" id="subs-reload">↻ neu laden</button>
+            <span class="spacer"></span>
+            <button class="btn" id="subs-new" title="Manuell einen Themen-Vorschlag anlegen (Test/Casual)">+ Vorschlag</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="subs-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Titel</th>
+                <th>Slug</th>
+                <th>Kategorie</th>
+                <th>Von</th>
+                <th>Eingereicht</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -328,6 +380,39 @@
       </footer>
     </div>
     <div class="wizard-backdrop" id="tunnel-modal-backdrop"></div>
+  </div>
+
+  <!-- Submission-Modal -->
+  <div class="wizard" id="subs-modal" aria-hidden="true">
+    <div class="wizard-shell" style="width: min(560px, 100%);">
+      <header class="wizard-head">
+        <div>
+          <small class="muted">Auge-Submission</small>
+          <h3>Neuer Themen-Vorschlag</h3>
+        </div>
+        <button class="btn ghost" id="subs-modal-close">✕</button>
+      </header>
+      <div class="wizard-body">
+        <div class="field"><label><span>Titel</span></label>
+          <input id="sm-titel" placeholder="z.B. Fourier-Transformation visuell" /></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="field"><label><span>Slug</span><span class="type-tag">a-z0-9-</span></label>
+            <input id="sm-slug" placeholder="fourier-visuell" /></div>
+          <div class="field"><label><span>Kategorie</span><span class="type-tag">optional</span></label>
+            <input id="sm-kategorie" placeholder="cs / kunst / …" /></div>
+        </div>
+        <div class="field"><label><span>Beschreibung</span><span class="type-tag">optional</span></label>
+          <textarea id="sm-beschreibung" rows="4" placeholder="Worum soll's gehen, warum interessant?"></textarea></div>
+        <div class="field"><label><span>Vorgeschlagen von</span><span class="type-tag">optional</span></label>
+          <input id="sm-von" placeholder="Name / Handle" /></div>
+      </div>
+      <footer class="wizard-foot">
+        <button class="btn ghost" id="subs-modal-cancel">abbrechen</button>
+        <span class="spacer"></span>
+        <button class="btn" id="subs-modal-save">einreichen</button>
+      </footer>
+    </div>
+    <div class="wizard-backdrop" id="subs-modal-backdrop"></div>
   </div>
 
   <div id="toasts" class="toasts"></div>

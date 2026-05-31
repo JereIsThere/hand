@@ -17,6 +17,7 @@ const {
   ORIENTDB_PASS = '',
   ORIENTDB_DB = 'mydb',
   PORT = 3737,
+  N8N_BUILD_WEBHOOK = '',
   SSH_HOST = '',
   SSH_USER = '',
   SSH_PORT = '22',
@@ -142,6 +143,115 @@ app.post('/api/query', wrap(async (req) => {
     headers: { 'Content-Type': 'text/plain' },
   });
   return { rows: result.result ?? result, raw: result };
+}));
+
+// ============================================================
+// Auge-Submissions  (User schlägt Thema vor → Admin genehmigt → n8n baut)
+//
+// Datenmodell: Vertex-Klasse `Submission` in derselben OrientDB.
+// Flow:  pending → approved (n8n-Build getriggert) → built   |   rejected
+// Siehe auge-framework/docs/adr/0001-auge-hand-kopplung.md
+// ============================================================
+const SUBMISSION_STATI = ['pending', 'approved', 'rejected', 'built'];
+
+// Schema einmalig sicherstellen (idempotent, best-effort beim Boot).
+async function ensureSubmissionSchema() {
+  const stmts = [
+    'CREATE CLASS Submission IF NOT EXISTS EXTENDS V',
+    'CREATE PROPERTY Submission.slug IF NOT EXISTS STRING',
+    'CREATE PROPERTY Submission.titel IF NOT EXISTS STRING',
+    'CREATE PROPERTY Submission.kategorie IF NOT EXISTS STRING',
+    'CREATE PROPERTY Submission.beschreibung IF NOT EXISTS STRING',
+    'CREATE PROPERTY Submission.vorgeschlagenVon IF NOT EXISTS STRING',
+    'CREATE PROPERTY Submission.status IF NOT EXISTS STRING',
+    'CREATE PROPERTY Submission.createdAt IF NOT EXISTS DATETIME',
+    'CREATE PROPERTY Submission.decidedAt IF NOT EXISTS DATETIME',
+    'CREATE PROPERTY Submission.entscheidGrund IF NOT EXISTS STRING',
+    'CREATE PROPERTY Submission.buildRef IF NOT EXISTS STRING',
+    'CREATE INDEX Submission.status IF NOT EXISTS NOTUNIQUE',
+  ];
+  for (const sql of stmts) {
+    await odb(`/command/${ORIENTDB_DB}/sql`, {
+      method: 'POST', body: sql, headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+}
+
+async function getDoc(rid) {
+  return await odb(`/document/${ORIENTDB_DB}/${safeRid(rid)}`);
+}
+
+async function putDoc(rid, doc) {
+  return await odb(`/document/${ORIENTDB_DB}/${safeRid(rid)}`, {
+    method: 'PUT', body: JSON.stringify(doc),
+  });
+}
+
+// n8n-Build-Workflow anstoßen. Best-effort: Fehler werden zurückgegeben,
+// aber die Genehmigung bleibt bestehen (manueller Retrigger möglich).
+async function triggerBuild(submission) {
+  if (!N8N_BUILD_WEBHOOK) return { triggered: false, reason: 'N8N_BUILD_WEBHOOK nicht gesetzt' };
+  try {
+    const res = await fetch(N8N_BUILD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'submission.approved', submission }),
+    });
+    return { triggered: res.ok, status: res.status };
+  } catch (e) {
+    return { triggered: false, reason: e.message };
+  }
+}
+
+app.get('/api/submissions', wrap(async (req) => {
+  const status = SUBMISSION_STATI.includes(req.query.status) ? req.query.status : null;
+  const where = status ? ` WHERE status = '${status}'` : '';
+  const result = await odb(`/command/${ORIENTDB_DB}/sql`, {
+    method: 'POST',
+    body: `SELECT @rid, * FROM Submission${where} ORDER BY createdAt DESC LIMIT 200`,
+    headers: { 'Content-Type': 'text/plain' },
+  });
+  return { rows: result.result || [] };
+}));
+
+app.post('/api/submissions', wrap(async (req) => {
+  const b = req.body || {};
+  const slug = safeId(String(b.slug || '')).toLowerCase();
+  const titel = String(b.titel || '').trim();
+  if (!slug || !titel) {
+    throw Object.assign(new Error('slug und titel sind Pflicht'), { status: 400 });
+  }
+  const doc = {
+    '@class': 'Submission',
+    slug,
+    titel,
+    kategorie: String(b.kategorie || '').trim() || null,
+    beschreibung: String(b.beschreibung || '').trim() || null,
+    vorgeschlagenVon: String(b.vorgeschlagenVon || '').trim() || null,
+    status: 'pending',
+    createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+  };
+  return await odb(`/document/${ORIENTDB_DB}`, { method: 'POST', body: JSON.stringify(doc) });
+}));
+
+app.post('/api/submissions/:rid/approve', wrap(async (req) => {
+  const doc = await getDoc(req.params.rid);
+  if (doc.status === 'rejected') {
+    throw Object.assign(new Error('bereits abgelehnt — erst zurücksetzen'), { status: 409 });
+  }
+  doc.status = 'approved';
+  doc.decidedAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const saved = await putDoc(req.params.rid, doc);
+  const build = await triggerBuild({ rid: doc['@rid'] || `#${safeRid(req.params.rid)}`, ...doc });
+  return { record: saved, build };
+}));
+
+app.post('/api/submissions/:rid/reject', wrap(async (req) => {
+  const doc = await getDoc(req.params.rid);
+  doc.status = 'rejected';
+  doc.decidedAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  doc.entscheidGrund = String(req.body?.grund || '').trim() || null;
+  return { record: await putDoc(req.params.rid, doc) };
 }));
 
 // ============================================================
@@ -435,9 +545,20 @@ async function main() {
     catch (e) { console.error(`  ! OrientDB-Tunnel Auto-Start: ${e.message}\n`); }
   }
 
+  // Submission-Schema sicherstellen (best-effort — wenn OrientDB noch nicht
+  // erreichbar ist, läuft der Server trotzdem; das Schema entsteht beim
+  // ersten erfolgreichen Boot mit Verbindung).
+  try {
+    await ensureSubmissionSchema();
+    console.log('        Submission-Schema: ok');
+  } catch (e) {
+    console.error(`  ! Submission-Schema nicht angelegt (OrientDB erreichbar?): ${e.message}`);
+  }
+
   app.listen(PORT, () => {
     console.log(`  Die Hand  -> http://localhost:${PORT}`);
     console.log(`        OrientDB-Proxy -> ${ORIENTDB_URL}  (db: ${ORIENTDB_DB})`);
+    console.log(`        n8n-Build-Webhook: ${N8N_BUILD_WEBHOOK ? 'gesetzt' : '— nicht gesetzt —'}`);
     console.log(`        Tunnels: ${tunnels.list().length} konfiguriert\n`);
   });
 }

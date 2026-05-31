@@ -6,6 +6,7 @@ Aktuelle Tools:
 
 - **OrientDB** — Schema-Browser, Records-Tabelle, Editor (typisiert + Raw-JSON), Klassen-Wizard, SQL/Gremlin-Konsole. (war früher als eigenständiges `orientdb-admin` unterwegs, wurde in `hand` reingezogen)
 - **SSH-Tunnel** — Tunnel-Manager. Der für OrientDB ist aus `.env` als „managed" vorkonfiguriert (auto-startet beim Server-Boot). Weitere Tunnel kommen über die UI dazu (persistiert in `tunnels.json`).
+- **Auge-Submissions** — Themen-Vorschläge für [auge](https://github.com/JereIsThere/auge). Vorschläge landen als `Submission`-Vertices in derselben OrientDB. Admin sieht die offenen, **genehmigt** (→ stößt einen n8n-Build-Workflow an, `N8N_BUILD_WEBHOOK`) oder **lehnt ab**. Flow: `pending → approved → built` | `rejected`. Das `Submission`-Schema wird beim Server-Boot idempotent angelegt. Siehe [auge-framework ADR-0001](https://github.com/JereIsThere/auge-framework/blob/main/docs/adr/0001-auge-hand-kopplung.md).
 - **Projects / Funkner** — externe Seiten (`projects.jeremias-groehl.de`, `funkner.jeremias-groehl.de`) eingebettet per iframe, lazy beim ersten Öffnen. Falls die Seite das Einbetten verweigert (X-Frame-Options/CSP), erscheint ein „neuer Tab"-Fallback.
 
 Daneben gibt es **Zettel** (`scripts/zettel/`) — eine eigenständige Windows-Sticky-Note (always-on-top, resizable, WPF via PowerShell), die *nicht* Teil der Web-Shell ist, sondern als nativer Desktop-Begleiter danebenliegt. Siehe `scripts/zettel/README.md`.
@@ -74,13 +75,24 @@ Weitere Tunnel anlegen: SSH-Tunnel-Tab → `+ Tunnel` → Felder ausfüllen → 
 | POST    | `/api/tunnels/:id/stop`       | ssh-Prozess killen                           |
 | GET     | `/api/tunnels/:id/log`        | tail des stdout/stderr (letzte 80 Zeilen)    |
 
+### Submissions
+
+| Methode | Pfad                              | Was                                                        |
+|---------|-----------------------------------|------------------------------------------------------------|
+| GET     | `/api/submissions?status=`        | Vorschläge listen (Filter: pending/approved/rejected/built) |
+| POST    | `/api/submissions`                | Neuer Vorschlag `{ slug, titel, kategorie?, beschreibung?, vorgeschlagenVon? }` → status `pending` |
+| POST    | `/api/submissions/:rid/approve`   | genehmigen → status `approved`, triggert `N8N_BUILD_WEBHOOK` |
+| POST    | `/api/submissions/:rid/reject`    | ablehnen `{ grund? }` → status `rejected`                  |
+
 ## Struktur
 
 ```
 hand/
 ├── server.js
 │   ├── OrientDB-Proxy (Basic-Auth aus .env)
-│   └── TunnelManager (managed via .env + unmanaged via tunnels.json)
+│   ├── TunnelManager (managed via .env + unmanaged via tunnels.json)
+│   └── Submissions (Submission-Schema-Ensure + approve→n8n-Webhook)
+├── Dockerfile          — Container für das auge-framework-compose
 ├── scripts/
 │   ├── start.cmd        — Windows-Launcher
 │   ├── install.ps1      — Startmenü-Verknüpfung
@@ -90,7 +102,8 @@ hand/
 │   ├── styles.css
 │   ├── app/main.js      — Shell + Tool-Switching
 │   ├── tools/
-│   │   └── tunnels.js   — SSH-Tunnel-Tab
+│   │   ├── tunnels.js     — SSH-Tunnel-Tab
+│   │   └── submissions.js — Auge-Submissions-Tab
 │   ├── features/        — OrientDB-Feature-Slices
 │   │   ├── schema.js
 │   │   ├── records.js
