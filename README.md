@@ -24,18 +24,40 @@ npm start
 
 Aufruf: <http://localhost:3737>
 
-## Windows-Integration
+`server.js` läuft dreifach nutzbar: headless (`npm start` / docker-compose) **und**
+als Backend der nativen Electron-App (siehe unten) — derselbe Code, kein Fork.
+
+## Native Desktop-App (Electron)
+
+Echte Windows-App: eigenes Fenster, Start­menü/Desktop-Icon, kein Konsolenfenster,
+kein Browser. Der Express-Server läuft **in-process** in der Electron-Hülle
+(`electron/main.mjs`), die Shell lädt aus `localhost`.
+
+```bash
+npm install
+npm run app            # App im Dev-Modus starten
+npm run make-icon      # build/icon.ico aus Vektor-Hand neu generieren (selten nötig)
+npm run dist           # NSIS-Installer bauen -> dist/Die Hand Setup <version>.exe
+```
+
+Der Installer (`npm run dist`) erzeugt ein Setup mit Installationspfad-Wahl,
+Desktop- + Startmenü-Verknüpfung und Uninstaller.
+
+**Daten/Secrets der gepackten App:** der App-Ordner ist read-only (asar), daher
+liegen `.env` und `tunnels.json` in **`%APPDATA%\Die Hand\`** (Electron-`userData`).
+Dort die `.env` anlegen (gleiche Keys wie `.env.example`). Im Dev-Modus (`npm run app`)
+wird zusätzlich die Projekt-`.env` gelesen.
+
+## Schlanke Variante (ohne Electron)
+
+Wer keinen Electron-Build will: `scripts\start.cmd` startet den Server und öffnet
+die Shell in einem chromelosen Browser-App-Fenster (`--app`).
 
 ```powershell
-.\scripts\install.ps1            # legt "Die Hand" im Startmenü an
+.\scripts\install.ps1            # legt "Die Hand" (start.cmd) im Startmenü an
 .\scripts\install.ps1 -Desktop   # zusätzlich Desktop-Verknüpfung
 .\scripts\uninstall.ps1          # entfernt die Verknüpfungen
 ```
-
-Die Verknüpfung startet `scripts\start.cmd`: Server hoch + die Shell öffnet sich
-in einem **chromelosen App-Fenster** (Edge/Chrome `--app`, sonst Standardbrowser) —
-eigener Taskleisten-Eintrag, fühlt sich wie eine native Desktop-App an
-(`scripts\open-app.ps1`).
 
 ## SSH-Tunnel
 

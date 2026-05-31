@@ -3,10 +3,16 @@ import path from 'path';
 import net from 'net';
 import fs from 'fs';
 import { spawn } from 'child_process';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import 'dotenv/config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Schreibbares Daten-Verzeichnis. Default = Projektordner (npm start / compose).
+// Die Electron-Hülle setzt HAND_DATA_DIR auf userData, weil der App-Ordner
+// (asar) read-only ist.
+const DATA_DIR = process.env.HAND_DATA_DIR || __dirname;
+
 const app = express();
 app.use(express.json({ limit: '4mb' }));
 app.use(express.text({ limit: '4mb', type: ['text/plain', 'application/sql'] }));
@@ -257,7 +263,7 @@ app.post('/api/submissions/:rid/reject', wrap(async (req) => {
 // ============================================================
 // Tunnel manager
 // ============================================================
-const TUNNELS_FILE = path.join(__dirname, 'tunnels.json');
+const TUNNELS_FILE = path.join(DATA_DIR, 'tunnels.json');
 const LOG_TAIL = 80;
 
 function probePort(host, port, timeoutMs = 600) {
@@ -536,7 +542,7 @@ function shutdown(sig) {
 }
 ['SIGINT', 'SIGTERM', 'SIGHUP'].forEach(s => process.on(s, () => shutdown(s)));
 
-async function main() {
+export async function startServer() {
   // Auto-start des managed (OrientDB) Tunnels, wenn konfiguriert.
   // Schlägt fehl -> nur loggen, der Tunnel-Tab kann ihn neu starten.
   const odbTunnel = tunnels.tunnels.get('orientdb');
@@ -555,12 +561,20 @@ async function main() {
     console.error(`  ! Submission-Schema nicht angelegt (OrientDB erreichbar?): ${e.message}`);
   }
 
-  app.listen(PORT, () => {
-    console.log(`  Die Hand  -> http://localhost:${PORT}`);
-    console.log(`        OrientDB-Proxy -> ${ORIENTDB_URL}  (db: ${ORIENTDB_DB})`);
-    console.log(`        n8n-Build-Webhook: ${N8N_BUILD_WEBHOOK ? 'gesetzt' : '— nicht gesetzt —'}`);
-    console.log(`        Tunnels: ${tunnels.list().length} konfiguriert\n`);
+  return new Promise((resolve) => {
+    const server = app.listen(PORT, () => {
+      console.log(`  Die Hand  -> http://localhost:${PORT}`);
+      console.log(`        OrientDB-Proxy -> ${ORIENTDB_URL}  (db: ${ORIENTDB_DB})`);
+      console.log(`        n8n-Build-Webhook: ${N8N_BUILD_WEBHOOK ? 'gesetzt' : '— nicht gesetzt —'}`);
+      console.log(`        Daten-Dir: ${DATA_DIR}`);
+      console.log(`        Tunnels: ${tunnels.list().length} konfiguriert\n`);
+      resolve({ server, port: Number(PORT) });
+    });
   });
 }
 
-main();
+// Direkt via `node server.js` gestartet? -> selbst hochfahren.
+// Von der Electron-Hülle importiert? -> die ruft startServer() selbst auf.
+const isEntrypoint = process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isEntrypoint) startServer();
