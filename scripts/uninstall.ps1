@@ -1,16 +1,19 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Entfernt orientdb-admin Verknuepfungen (Startmenue + Desktop).
+  Entfernt Die Hand Verknuepfungen (Startmenue + Desktop).
   Laesst node_modules und .env in Ruhe -- Code wird nicht angefasst.
+  Raeumt auch den alten 'OrientDB Admin'-Namen mit auf.
 #>
 $ErrorActionPreference = 'Stop'
 
-$ShortcutName = 'OrientDB Admin.lnk'
-$paths = @(
-  (Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') $ShortcutName),
-  (Join-Path ([Environment]::GetFolderPath('Desktop')) $ShortcutName)
+# aktueller Name + alter Legacy-Name (vor Umbenennung in "Die Hand")
+$ShortcutNames = @('Die Hand.lnk', 'OrientDB Admin.lnk')
+$dirs = @(
+  (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'),
+  ([Environment]::GetFolderPath('Desktop'))
 )
+$paths = foreach ($d in $dirs) { foreach ($n in $ShortcutNames) { Join-Path $d $n } }
 
 $removed = 0
 foreach ($p in $paths) {
