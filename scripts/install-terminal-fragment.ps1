@@ -28,21 +28,33 @@ if (-not $NodeExe) {
   $NodeExe = 'node'
 }
 
+$ShellCli   = (Join-Path $ProjectRoot 'shell-ai.mjs').Replace('\', '\\')
+$VaultCliJ  = $VaultCliWin.Replace('\', '\\')
+
 $fragment = @"
 {
   "profiles": [
     {
       "guid": "{a4b3c2d1-e5f6-7890-abcd-ef1234567890}",
       "name": "Die Hand · Vault",
-      "commandline": "node \"$VaultCliWin\"",
+      "commandline": "node \"$VaultCliJ\"",
       "startingDirectory": "$($ProjectRoot.Replace('\', '\\'))",
       "icon": "✋",
       "colorScheme": "One Half Dark",
-      "font": {
-        "face": "Cascadia Code",
-        "size": 13
-      },
+      "font": { "face": "Cascadia Code", "size": 13 },
       "tabTitle": "vault",
+      "suppressApplicationTitle": true,
+      "hidden": false
+    },
+    {
+      "guid": "{b5c4d3e2-f6a7-8901-bcde-fa2345678901}",
+      "name": "Die Hand · AI Shell",
+      "commandline": "node \"$ShellCli\"",
+      "startingDirectory": "$($ProjectRoot.Replace('\', '\\'))",
+      "icon": "✨",
+      "colorScheme": "One Half Dark",
+      "font": { "face": "Cascadia Code", "size": 13 },
+      "tabTitle": "ai shell",
       "suppressApplicationTitle": true,
       "hidden": false
     }
