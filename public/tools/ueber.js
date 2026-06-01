@@ -138,11 +138,37 @@ function renderRoadmap() {
   content.innerHTML = html;
 }
 
+// ── Update-Banner (Electron IPC) ──────────────────────────────────────
+function initUpdateListener() {
+  if (!window.electronAPI) return; // nur in Electron
+  window.electronAPI.onUpdateStatus((ev, info) => {
+    let banner = document.getElementById('update-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'update-banner';
+      banner.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#0e0820;border:1px solid #00d4c8;' +
+        'border-radius:10px;padding:12px 16px;font-size:13px;color:#e8e0f0;z-index:9999;' +
+        'display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:320px;';
+      document.body.append(banner);
+    }
+    if (info.status === 'available') {
+      banner.innerHTML = `<span>🔄 v${info.version} verfügbar — wird geladen…</span>`;
+    } else if (info.status === 'downloading') {
+      banner.innerHTML = `<span>⬇️ Update ${info.percent}%</span><div style="flex:1;height:4px;background:#1d1330;border-radius:2px;"><div style="width:${info.percent}%;height:100%;background:linear-gradient(90deg,#00d4c8,#d4a200);border-radius:2px;"></div></div>`;
+    } else if (info.status === 'ready') {
+      banner.innerHTML = `<span>✅ v${info.version} bereit</span><button onclick="window.electronAPI.installNow()" style="background:linear-gradient(90deg,#00d4c8,#d4a200);border:none;color:#06000e;font-weight:700;padding:6px 12px;border-radius:6px;cursor:pointer;">jetzt neu starten</button><button onclick="this.closest('#update-banner').remove()" style="background:none;border:none;color:#6f6488;cursor:pointer;font-size:18px;">×</button>`;
+    } else if (info.status === 'error') {
+      banner.innerHTML = `<span style="color:#ff8080">Update-Fehler: ${info.message}</span><button onclick="this.closest('#update-banner').remove()" style="background:none;border:none;color:#6f6488;cursor:pointer;">×</button>`;
+    }
+  });
+}
+
 let initialized = false;
 
 export function initUeber() {
   if (initialized) return;
   initialized = true;
+  initUpdateListener();
 }
 
 export function activateUeber() {
