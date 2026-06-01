@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import 'dotenv/config';
 import { setupAuth } from './auth.js';
 import { setupVault } from './vault.js';
+import { setupShellLog } from './shell-log.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -78,7 +79,8 @@ const wrap = (fn) => async (req, res) => {
 // ============================================================
 const authz = setupAuth(app, { odb, dbName: ORIENTDB_DB });
 app.use('/api', authz.requireAdmin());
-const vaultModule = setupVault(app, { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
+const vaultModule   = setupVault(app,    { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
+const shellLogModule = setupShellLog(app, { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
 
 // ============================================================
 // OrientDB endpoints
@@ -569,7 +571,9 @@ export async function startServer() {
     await ensureSubmissionSchema();
     if (authz.enabled) await authz.ensurePersonSchema();
     if (process.env.VAULT_KEY) await vaultModule.ensureSchema();
-    console.log('        Schema (Submission' + (authz.enabled ? ' + Person' : '') + (process.env.VAULT_KEY ? ' + Secret' : '') + '): ok');
+    if (process.env.ANTHROPIC_API_KEY) await shellLogModule.ensureSchema();
+    const schemas = ['Submission', authz.enabled && 'Person', process.env.VAULT_KEY && 'Secret', process.env.ANTHROPIC_API_KEY && 'ShellLog'].filter(Boolean);
+    console.log(`        Schema (${schemas.join(' + ')}): ok`);
   } catch (e) {
     console.error(`  ! Schema nicht angelegt (OrientDB erreichbar?): ${e.message}`);
   }
