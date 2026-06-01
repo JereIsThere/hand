@@ -1,6 +1,14 @@
 import { $ } from '../shared/ui.js';
 import { me } from '../auth/gate.js';
 
+const PLATFORMS = [
+  { icon: '🖥️', name: 'Windows',  sub: 'Electron-App + NSIS-Installer + Auto-Update',       status: 'done' },
+  { icon: '📱', name: 'Android',  sub: 'PWA via Chrome — installierbar',                      status: 'done' },
+  { icon: '🍎', name: 'iOS',      sub: 'PWA via Safari — gebaut, wartet auf HTTPS live',       status: 'active' },
+  { icon: '🌐', name: 'Mac',      sub: 'nur Browser (PWA) — kein nativer Build geplant',       status: 'planned' },
+  { icon: '🐧', name: 'Linux',    sub: 'nur Browser — AppImage möglich aber kein Bedarf',      status: 'idea' },
+];
+
 const ROADMAP = [
   {
     phase: '✅ v0.7 — Fundament',
@@ -78,14 +86,21 @@ function renderRoadmap() {
   let html = `
     <div style="margin-bottom:32px;">
       <h2 style="font-family:Georgia,serif;font-size:22px;color:#e8e0f0;margin-bottom:8px;">Die Hand</h2>
-      <p style="color:#9a8fb5;font-size:14px;line-height:1.7;max-width:560px;">
-        Tool-Shell für den Freundeskreis. Gebaut von Jere mit Claude/Egon.
-        Vollständig vibecoded — lies die
-        <a href="https://github.com/JereIsThere/hand/releases/tag/v0.7.0" target="_blank"
-           style="color:#00d4c8;">Release Notes</a> für Egons ehrliche Vorbemerkung.
-      </p>
-    </div>
-    <div style="margin-bottom:32px;">
+      <h3 style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#9a8fb5;margin-bottom:12px;">Plattformen</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:32px;">
+        ${PLATFORMS.map(p => {
+          const col = STATUS_COLOR[p.status];
+          const bg  = STATUS_BG[p.status];
+          const dot = p.status === 'done' ? '✓' : p.status === 'active' ? '◑' : p.status === 'planned' ? '·' : '○';
+          return `<div style="background:${bg};border:1px solid ${col}33;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:18px;margin-bottom:4px;">${p.icon}</div>
+            <div style="font-size:13px;font-weight:700;color:${col};display:flex;align-items:center;gap:6px;">
+              <span>${dot}</span>${p.name}
+            </div>
+            <div style="font-size:11px;color:#6f6488;margin-top:3px;line-height:1.5;">${p.sub}</div>
+          </div>`;
+        }).join('')}
+      </div>
       <h3 style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#9a8fb5;margin-bottom:16px;">Roadmap</h3>
   `;
 
