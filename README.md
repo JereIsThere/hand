@@ -27,6 +27,15 @@ Aufruf: <http://localhost:3737>
 `server.js` läuft dreifach nutzbar: headless (`npm start` / docker-compose) **und**
 als Backend der nativen Electron-App (siehe unten) — derselbe Code, kein Fork.
 
+## Auth & Rollen (Google, optional)
+
+Ohne `GOOGLE_CLIENT_ID/SECRET/SESSION_SECRET` läuft hand lokal-offen als Single-
+Operator (= admin), wie bisher. Mit gesetzten Keys greift **Google-OAuth +
+Approval-Flow**: Login → `pending` → Admin (arm) gibt im **Freunde**-Tool frei.
+Personen/Rollen liegen in OrientDB (`Person`). Privilegierte Tools (OrientDB,
+Tunnel, Submissions, Freunde) sind Admin-only; Freunde sehen nur casual Tools.
+Details: [docs/adr-auth-arm-hand.md](docs/adr-auth-arm-hand.md). Setup-Keys: `.env.example`.
+
 ## Native Desktop-App (Electron)
 
 Echte Windows-App: eigenes Fenster, Start­menü/Desktop-Icon, kein Konsolenfenster,

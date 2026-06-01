@@ -18,32 +18,36 @@
       </div>
     </div>
     <nav class="sidebar-nav">
-      <button class="sb-item active" data-tool="orientdb">
+      <button class="sb-item active" data-tool="orientdb" data-role="admin">
         <span class="sb-icon">🜲</span>
         <span class="sb-label">OrientDB</span>
       </button>
-      <button class="sb-item" data-tool="tunnels">
+      <button class="sb-item" data-tool="tunnels" data-role="admin">
         <span class="sb-icon">🔐</span>
         <span class="sb-label">SSH-Tunnel</span>
       </button>
-      <button class="sb-item" data-tool="submissions">
+      <button class="sb-item" data-tool="submissions" data-role="admin">
         <span class="sb-icon">📥</span>
         <span class="sb-label">Submissions</span>
       </button>
-      <div class="sb-sep"></div>
-      <button class="sb-item" data-tool="projects">
+      <button class="sb-item" data-tool="friends" data-role="admin">
+        <span class="sb-icon">🤝</span>
+        <span class="sb-label">Freunde</span>
+      </button>
+      <div class="sb-sep" data-role="admin"></div>
+      <button class="sb-item" data-tool="projects" data-role="admin">
         <span class="sb-icon">📋</span>
         <span class="sb-label">Projects</span>
         <span class="sb-ext" title="extern eingebettet">↗</span>
       </button>
-      <button class="sb-item" data-tool="funkner">
+      <button class="sb-item" data-tool="funkner" data-role="admin">
         <span class="sb-icon">📡</span>
         <span class="sb-label">Funkner</span>
         <span class="sb-ext" title="extern eingebettet">↗</span>
       </button>
     </nav>
     <div class="sidebar-foot">
-      <small class="muted">v0.3 · localhost:3737</small>
+      <small class="muted" id="sidebar-foot-label">v0.5 · localhost:3737</small>
     </div>
   </aside>
 
@@ -211,6 +215,57 @@
             <tbody></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TOOL · Freunde (Admin: Zugang verwalten)
+         ========================================================= -->
+    <section class="tool" id="tool-friends">
+      <header class="topbar">
+        <div class="brand"><h1>Freunde</h1></div>
+        <div class="status">
+          <span class="dot" id="friends-dot"></span>
+          <span id="friends-status-text">—</span>
+        </div>
+      </header>
+      <div class="tool-body">
+        <div class="panel-head">
+          <div class="controls">
+            <label>Filter
+              <select id="friends-filter">
+                <option value="">alle</option>
+                <option value="pending" selected>wartend</option>
+                <option value="approved">freigegeben</option>
+                <option value="rejected">abgelehnt</option>
+              </select>
+            </label>
+            <button class="btn ghost" id="friends-reload">↻ neu laden</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="friends-table">
+            <thead>
+              <tr><th>Status</th><th>Person</th><th>Rolle</th><th>Angemeldet</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TOOL · Willkommen (für Freunde ohne Admin-Tools)
+         ========================================================= -->
+    <section class="tool" id="tool-willkommen">
+      <header class="topbar">
+        <div class="brand"><h1>Willkommen ✋</h1></div>
+      </header>
+      <div class="tool-body">
+        <p class="muted" style="padding:24px;max-width:60ch;">
+          Schön, dass du da bist. Hier entstehen gerade die Tools für den
+          Freundeskreis — Chat (sprecher) kommt als Nächstes.
+        </p>
       </div>
     </section>
 

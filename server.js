@@ -5,6 +5,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
 import 'dotenv/config';
+import { setupAuth } from './auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -68,6 +69,14 @@ const wrap = (fn) => async (req, res) => {
     res.status(e.status || 500).json({ error: e.message, payload: e.payload });
   }
 };
+
+// ============================================================
+// Auth (Google-OAuth + Rollen). Opt-in via GOOGLE_CLIENT_ID/SECRET/SESSION_SECRET.
+// Registriert /api/me, /auth/*, /api/persons. Danach sind alle weiteren
+// /api-Endpoints (OrientDB, Tunnels, Submissions) Admin-only.
+// ============================================================
+const authz = setupAuth(app, { odb, dbName: ORIENTDB_DB });
+app.use('/api', authz.requireAdmin());
 
 // ============================================================
 // OrientDB endpoints
@@ -556,9 +565,10 @@ export async function startServer() {
   // ersten erfolgreichen Boot mit Verbindung).
   try {
     await ensureSubmissionSchema();
-    console.log('        Submission-Schema: ok');
+    if (authz.enabled) await authz.ensurePersonSchema();
+    console.log('        Schema (Submission' + (authz.enabled ? ' + Person' : '') + '): ok');
   } catch (e) {
-    console.error(`  ! Submission-Schema nicht angelegt (OrientDB erreichbar?): ${e.message}`);
+    console.error(`  ! Schema nicht angelegt (OrientDB erreichbar?): ${e.message}`);
   }
 
   return new Promise((resolve) => {
@@ -566,6 +576,7 @@ export async function startServer() {
       console.log(`  Die Hand  -> http://localhost:${PORT}`);
       console.log(`        OrientDB-Proxy -> ${ORIENTDB_URL}  (db: ${ORIENTDB_DB})`);
       console.log(`        n8n-Build-Webhook: ${N8N_BUILD_WEBHOOK ? 'gesetzt' : '— nicht gesetzt —'}`);
+      console.log(`        Auth: ${authz.enabled ? 'Google-OAuth aktiv (Approval-Flow)' : '— aus (lokal-offen) —'}`);
       console.log(`        Daten-Dir: ${DATA_DIR}`);
       console.log(`        Tunnels: ${tunnels.list().length} konfiguriert\n`);
       resolve({ server, port: Number(PORT) });
