@@ -138,9 +138,19 @@ export function setupAuth(app, { odb, dbName }) {
     if (!enabled) return { email: 'operator', name: 'Operator', role: 'admin', status: 'approved' };
     const sess = sessionFromReq(req);
     if (!sess?.email) return null;
-    const p = await findPerson(sess.email);
-    if (!p) return null;
-    return { email: p.email, name: p.name, picture: p.picture, role: p.role, status: p.status };
+    const email = sess.email.toLowerCase();
+    // Admins (ADMIN_EMAILS) sind unabhängig von der DB-Verfügbarkeit drin —
+    // so funktioniert der Admin-Login auch ohne erreichbare OrientDB.
+    if (admins.has(email)) {
+      return { email, name: sess.name || email, role: 'admin', status: 'approved' };
+    }
+    try {
+      const p = await findPerson(email);
+      if (!p) return null;
+      return { email: p.email, name: p.name, picture: p.picture, role: p.role, status: p.status };
+    } catch {
+      return null; // DB nicht erreichbar -> Freunde können (noch) nicht rein
+    }
   }
 
   const requireAuth = (handler) => async (req, res, next) => {
@@ -207,8 +217,12 @@ export function setupAuth(app, { odb, dbName }) {
         if (!profile.email || profile.email_verified === false) {
           throw new Error('Keine verifizierte E-Mail von Google');
         }
-        await upsertOnLogin(profile);
-        setCookie(res, COOKIE, sign({ email: profile.email.toLowerCase() }, SESSION_SECRET),
+        // Person persistieren — best-effort: schlägt die DB fehl, kommt der
+        // Admin trotzdem rein (Freunde brauchen die DB für den pending-State).
+        try { await upsertOnLogin(profile); }
+        catch (e) { console.error(`  ! Person-Upsert (OrientDB erreichbar?): ${e.message}`); }
+        setCookie(res, COOKIE,
+          sign({ email: profile.email.toLowerCase(), name: profile.name || '' }, SESSION_SECRET),
           { maxAge: SESSION_MAX_AGE, secure });
         setCookie(res, STATE_COOKIE, '', { maxAge: 0, secure });
         res.redirect('/');
