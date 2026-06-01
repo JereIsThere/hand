@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
 import 'dotenv/config';
 import { setupAuth } from './auth.js';
+import { SETUP_KEYS } from './setup-config.js';
 import { setupVault } from './vault.js';
 import { setupShellLog } from './shell-log.js';
 
@@ -81,6 +82,17 @@ const authz = setupAuth(app, { odb, dbName: ORIENTDB_DB });
 app.use('/api', authz.requireAdmin());
 const vaultModule   = setupVault(app,    { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
 const shellLogModule = setupShellLog(app, { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
+
+// ── Setup-Status ────────────────────────────────────────────────────
+// Gibt zurück welche optionalen Keys gesetzt/fehlend sind (kein Klartext).
+app.get('/api/setup-status', authz.requireAdmin(), async (req, res) => {
+  const items = SETUP_KEYS.map(k => ({
+    ...k,
+    set: !!(process.env[k.key]),
+  }));
+  const missing = items.filter(k => !k.set && !k.bootstrapHint).length;
+  res.json({ items, missing });
+});
 
 // ============================================================
 // OrientDB endpoints

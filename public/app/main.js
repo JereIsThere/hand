@@ -11,6 +11,7 @@ import { initFriends, activateFriends, deactivateFriends } from '../tools/friend
 import { initVaultUi, activateVaultUi, deactivateVaultUi } from '../tools/vault-ui.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
 import { initAuth, isAdmin } from '../auth/gate.js';
+import { checkAndShowSetupWizard, initSetupButton } from '../auth/setup.js';
 
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
@@ -117,7 +118,12 @@ async function bootstrap() {
   // Shell-Switching (immer)
   $$('.sb-item').forEach(b => b.addEventListener('click', () => switchTool(b.dataset.tool)));
 
+  initSetupButton();
+
   if (isAdmin()) {
+    // Setup-Wizard beim ersten Start wenn Keys fehlen
+    checkAndShowSetupWizard();
+
     // shared overlays (editor + wizard) — tool-übergreifend
     initEditor();
     initWizard();
