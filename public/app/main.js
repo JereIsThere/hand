@@ -7,15 +7,22 @@ import { initQuery } from '../features/query.js';
 import { initWizard, openWizard } from '../features/class-wizard.js';
 import { initTunnels, activateTunnels, deactivateTunnels } from '../tools/tunnels.js';
 import { initSubmissions, activateSubmissions, deactivateSubmissions } from '../tools/submissions.js';
+import { initFriends, activateFriends, deactivateFriends } from '../tools/friends.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
+import { initAuth, isAdmin } from '../auth/gate.js';
 
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
 // ----------------------------------------------------------------
-const TOOLS = ['orientdb', 'tunnels', 'submissions', 'projects', 'funkner'];
+const TOOLS = ['orientdb', 'tunnels', 'submissions', 'friends', 'projects', 'funkner', 'willkommen'];
 
 function switchTool(name) {
-  if (!TOOLS.includes(name)) name = 'orientdb';
+  const fallback = isAdmin() ? 'orientdb' : 'willkommen';
+  if (!TOOLS.includes(name)) name = fallback;
+  // Nicht-Admins dürfen nur Nicht-Admin-Tools sehen.
+  const item = document.querySelector(`.sb-item[data-tool="${name}"]`);
+  if (!isAdmin() && item && item.dataset.role === 'admin') name = fallback;
+
   $$('.sb-item').forEach(b => b.classList.toggle('active', b.dataset.tool === name));
   $$('.tool').forEach(t => t.classList.toggle('active', t.id === `tool-${name}`));
   history.replaceState(null, '', `#${name}`);
@@ -23,6 +30,8 @@ function switchTool(name) {
   else                    deactivateTunnels();
   if (name === 'submissions') activateSubmissions();
   else                        deactivateSubmissions();
+  if (name === 'friends') activateFriends();
+  else                    deactivateFriends();
   if (name === 'projects' || name === 'funkner') activateEmbed(name);
 }
 
@@ -89,41 +98,54 @@ async function refreshOrientdb() {
 // ----------------------------------------------------------------
 // Bootstrap
 // ----------------------------------------------------------------
+function applyRole() {
+  if (isAdmin()) return;
+  // Freunde sehen keine Admin-Tools.
+  $$('[data-role="admin"]').forEach((e) => { e.style.display = 'none'; });
+}
+
 async function bootstrap() {
-  // shared overlays (editor + wizard) initialisieren — sind tool-übergreifend nutzbar
-  initEditor();
-  initWizard();
+  // Auth zuerst: bei Login/Pending wird ein Overlay gezeigt und wir booten nicht.
+  const gate = await initAuth();
+  if (!gate.ok) return;
 
-  // OrientDB-internal listeners
-  initQuery();
-  $$('#tool-orientdb .tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
-  $('#reload-schema').addEventListener('click', refreshOrientdb);
-  $('#records-load').addEventListener('click', () => loadRecords(true));
-  $('#records-class').addEventListener('change', () => loadRecords(true));
-  $('#records-new').addEventListener('click', () => {
-    const cls = $('#records-class').value;
-    if (!cls) { toast('Keine Klasse gewählt', 'fail'); return; }
-    newEntryFor(cls);
-  });
-  $('#open-wizard').addEventListener('click', () => openWizard(lastClasses, refreshOrientdb));
+  applyRole();
 
-  // Tunnels-internal listeners
-  initTunnels();
-
-  // Submissions-internal listeners
-  initSubmissions();
-
-  // External embed tools
-  initEmbeds();
-
-  // Shell-Switching
+  // Shell-Switching (immer)
   $$('.sb-item').forEach(b => b.addEventListener('click', () => switchTool(b.dataset.tool)));
-  const initialTool = (location.hash || '#orientdb').slice(1);
-  switchTool(initialTool);
 
-  // initial loads
-  await probeConnection();
-  await refreshOrientdb();
+  if (isAdmin()) {
+    // shared overlays (editor + wizard) — tool-übergreifend
+    initEditor();
+    initWizard();
+
+    // OrientDB-internal listeners
+    initQuery();
+    $$('#tool-orientdb .tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+    $('#reload-schema').addEventListener('click', refreshOrientdb);
+    $('#records-load').addEventListener('click', () => loadRecords(true));
+    $('#records-class').addEventListener('change', () => loadRecords(true));
+    $('#records-new').addEventListener('click', () => {
+      const cls = $('#records-class').value;
+      if (!cls) { toast('Keine Klasse gewählt', 'fail'); return; }
+      newEntryFor(cls);
+    });
+    $('#open-wizard').addEventListener('click', () => openWizard(lastClasses, refreshOrientdb));
+
+    initTunnels();
+    initSubmissions();
+    initFriends();
+    initEmbeds();
+
+    const initialTool = (location.hash || '#orientdb').slice(1);
+    switchTool(initialTool);
+
+    await probeConnection();
+    await refreshOrientdb();
+  } else {
+    // Freund: nur die Willkommen-Ansicht (bis casual Tools wie sprecher kommen).
+    switchTool('willkommen');
+  }
 }
 
 bootstrap();
