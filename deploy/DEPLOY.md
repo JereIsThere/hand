@@ -74,6 +74,19 @@ certbot ergänzt den 443-Block + http→https-Redirect automatisch.
 - Du (in `ADMIN_EMAILS`) kommst als **Admin** durch → alle Tools.
 - Ein Freund: meldet sich an → `pending` → du gibst im **Freunde**-Tool frei.
 
+## 🖥️ Windows-Installer bauen + als GitHub Release veröffentlichen
+
+```powershell
+# GH_TOKEN = GitHub Personal Access Token (repo-Scope bzw.
+# fine-grained: contents:write + releases:write auf JereIsThere/hand).
+# Heißt genau GH_TOKEN — das ist der von electron-builder + gh CLI erwartete Name.
+$env:GH_TOKEN = "github_pat_…"
+npm run dist:publish   # baut NSIS-Installer + lädt ihn ins GitHub Release hoch
+```
+
+Der Build legt dabei auch `latest.yml` ans Release an — das braucht
+electron-updater in der Desktop-App, um Updates zu finden.
+
 ## 🔁 Updates / Auto-Deploy
 
 Manuell:
