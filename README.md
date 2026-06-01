@@ -36,6 +36,13 @@ Personen/Rollen liegen in OrientDB (`Person`). Privilegierte Tools (OrientDB,
 Tunnel, Submissions, Freunde) sind Admin-only; Freunde sehen nur casual Tools.
 Details: [docs/adr-auth-arm-hand.md](docs/adr-auth-arm-hand.md). Setup-Keys: `.env.example`.
 
+## Server-Deploy (Freundeskreis-Hub)
+
+Headless hinter nginx + HTTPS, mit Google-Auth — Runbook + Vorlagen unter
+[`deploy/`](deploy/DEPLOY.md) (systemd-Service, nginx-Config, Prod-`.env`).
+Kurz: klonen → `npm ci --omit=dev` → `.env` setzen → `hand.service` enablen →
+nginx + certbot. Alternativ via auge-framework-`docker-compose`.
+
 ## Native Desktop-App (Electron)
 
 Echte Windows-App: eigenes Fenster, Start­menü/Desktop-Icon, kein Konsolenfenster,
