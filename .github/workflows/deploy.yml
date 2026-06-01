@@ -1,0 +1,32 @@
+name: Deploy hand
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hand
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH -> Pull, install, restart
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            cd /var/lib/deploy/hand
+            git fetch --all --quiet
+            git reset --hard origin/main
+            npm ci --omit=dev
+            sudo systemctl restart hand
+            systemctl is-active hand
+            echo "deployed: $(git rev-parse --short HEAD)"

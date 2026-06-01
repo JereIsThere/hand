@@ -74,14 +74,28 @@ certbot ergänzt den 443-Block + http→https-Redirect automatisch.
 - Du (in `ADMIN_EMAILS`) kommst als **Admin** durch → alle Tools.
 - Ein Freund: meldet sich an → `pending` → du gibst im **Freunde**-Tool frei.
 
-## 🔁 Updates später
+## 🔁 Updates / Auto-Deploy
 
+Manuell:
 ```bash
 cd /var/lib/deploy/hand && git pull && npm ci --omit=dev && sudo systemctl restart hand
 ```
 
-(Optional später: GitHub-Action-Deploy wie bei auge, via sudoers-Whitelist
-`/etc/sudoers.d/deploy-hand` für `systemctl restart hand`.)
+**Auto-Deploy** läuft über `.github/workflows/deploy.yml` (push auf `main` →
+SSH → fetch/reset → `npm ci --omit=dev` → `systemctl restart hand`). Voraussetzungen:
+
+1. **sudoers-Whitelist** — damit der deploy-User den Service ohne Passwort neu
+   starten darf:
+   ```bash
+   echo 'deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart hand' \
+     | sudo tee /etc/sudoers.d/deploy-hand
+   sudo chmod 440 /etc/sudoers.d/deploy-hand
+   ```
+2. **GitHub-Repo-Secrets** (Settings → Secrets and variables → Actions) — gleiche
+   Werte wie bei reder:
+   - `SSH_HOST`, `SSH_USER` (= `deploy`), `SSH_PORT`, `SSH_PRIVATE_KEY`
+3. Der Server-Checkout (`/var/lib/deploy/hand`) muss gegen GitHub authentifiziert
+   sein (Clone hat ja geklappt → `git fetch` als deploy-User muss laufen).
 
 ## Alternative: docker-compose
 
