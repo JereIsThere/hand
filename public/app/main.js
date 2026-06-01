@@ -9,6 +9,7 @@ import { initTunnels, activateTunnels, deactivateTunnels } from '../tools/tunnel
 import { initSubmissions, activateSubmissions, deactivateSubmissions } from '../tools/submissions.js';
 import { initFriends, activateFriends, deactivateFriends } from '../tools/friends.js';
 import { initVaultUi, activateVaultUi, deactivateVaultUi } from '../tools/vault-ui.js';
+import { initSprecher, activateSprecher, deactivateSprecher } from '../tools/sprecher.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
 import { initAuth, isAdmin } from '../auth/gate.js';
 import { checkAndShowSetupWizard, initSetupButton } from '../auth/setup.js';
@@ -16,7 +17,7 @@ import { checkAndShowSetupWizard, initSetupButton } from '../auth/setup.js';
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
 // ----------------------------------------------------------------
-const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'funkner', 'willkommen'];
+const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'funkner', 'sprecher', 'willkommen'];
 
 function switchTool(name) {
   const fallback = isAdmin() ? 'orientdb' : 'willkommen';
@@ -32,6 +33,8 @@ function switchTool(name) {
   else                    deactivateTunnels();
   if (name === 'submissions') activateSubmissions();
   else                        deactivateSubmissions();
+  if (name === 'sprecher') activateSprecher();
+  else                     deactivateSprecher();
   if (name === 'vault')   activateVaultUi();
   else                    deactivateVaultUi();
   if (name === 'friends') activateFriends();
@@ -144,6 +147,7 @@ async function bootstrap() {
     initTunnels();
     initSubmissions();
     initVaultUi();
+    initSprecher();
     initFriends();
     initEmbeds();
 
@@ -153,8 +157,9 @@ async function bootstrap() {
     await probeConnection();
     await refreshOrientdb();
   } else {
-    // Freund: nur die Willkommen-Ansicht (bis casual Tools wie sprecher kommen).
-    switchTool('willkommen');
+    // Freunde: sprecher + Willkommen
+    initSprecher();
+    switchTool('sprecher');
   }
 }
 
