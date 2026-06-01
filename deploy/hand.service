@@ -1,0 +1,35 @@
+# systemd-Unit für Die Hand (headless Express-Server).
+# Ziel: /etc/systemd/system/hand.service
+#
+# Annahmen (anpassen falls anders):
+#   - App liegt in /var/lib/deploy/hand  (Home des deploy-Users)
+#   - .env liegt daneben: /var/lib/deploy/hand/.env  (von dotenv gelesen)
+#   - node >= 18 im PATH
+#
+# Aktivieren:
+#   sudo cp deploy/hand.service /etc/systemd/system/hand.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hand
+#   systemctl status hand   ·   journalctl -u hand -f
+
+[Unit]
+Description=Die Hand — Tool-Shell (Express)
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/var/lib/deploy/hand
+# .env wird von dotenv aus WorkingDirectory gelesen (kein EnvironmentFile nötig).
+ExecStart=/usr/bin/env node server.js
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+# leichte Härtung
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
