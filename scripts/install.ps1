@@ -91,6 +91,14 @@ if ($Desktop) {
   New-AdminShortcut -TargetDir ([Environment]::GetFolderPath('Desktop'))
 }
 
+# --- Windows-Terminal-Fragment (Vault-Profil) --------------------------
+try {
+  & "$PSScriptRoot\install-terminal-fragment.ps1"
+} catch {
+  Write-Warning "Windows-Terminal-Fragment nicht angelegt: $_"
+}
+
 Write-Host ""
 Write-Host "  Fertig. Im Startmenue nach 'Die Hand' suchen oder Win-Taste druecken und tippen." -ForegroundColor Cyan
+Write-Host "  Windows Terminal neu starten fuer das 'Die Hand - Vault'-Profil." -ForegroundColor Cyan
 Write-Host ""

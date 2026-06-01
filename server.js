@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
 import 'dotenv/config';
 import { setupAuth } from './auth.js';
+import { setupVault } from './vault.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -77,6 +78,7 @@ const wrap = (fn) => async (req, res) => {
 // ============================================================
 const authz = setupAuth(app, { odb, dbName: ORIENTDB_DB });
 app.use('/api', authz.requireAdmin());
+const vaultModule = setupVault(app, { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
 
 // ============================================================
 // OrientDB endpoints
@@ -566,7 +568,8 @@ export async function startServer() {
   try {
     await ensureSubmissionSchema();
     if (authz.enabled) await authz.ensurePersonSchema();
-    console.log('        Schema (Submission' + (authz.enabled ? ' + Person' : '') + '): ok');
+    if (process.env.VAULT_KEY) await vaultModule.ensureSchema();
+    console.log('        Schema (Submission' + (authz.enabled ? ' + Person' : '') + (process.env.VAULT_KEY ? ' + Secret' : '') + '): ok');
   } catch (e) {
     console.error(`  ! Schema nicht angelegt (OrientDB erreichbar?): ${e.message}`);
   }
