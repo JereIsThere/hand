@@ -9,6 +9,7 @@ import { setupAuth } from './auth.js';
 import { SETUP_KEYS } from './setup-config.js';
 import { setupVault } from './vault.js';
 import { setupShellLog } from './shell-log.js';
+import { setupSprecher } from './sprecher.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,7 +82,8 @@ const wrap = (fn) => async (req, res) => {
 const authz = setupAuth(app, { odb, dbName: ORIENTDB_DB });
 app.use('/api', authz.requireAdmin());
 const vaultModule   = setupVault(app,    { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
-const shellLogModule = setupShellLog(app, { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
+const shellLogModule  = setupShellLog(app,  { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
+const sprecherModule  = setupSprecher(app,  { odb, dbName: ORIENTDB_DB, requireAuth: authz.requireAuth });
 
 // ── Setup-Status ────────────────────────────────────────────────────
 // Gibt zurück welche optionalen Keys gesetzt/fehlend sind (kein Klartext).
@@ -587,6 +589,7 @@ export async function startServer() {
       await vaultModule.loadIntoEnv(); // Vault-Secrets → process.env (ergänzt fehlende)
     }
     if (process.env.ANTHROPIC_API_KEY) await shellLogModule.ensureSchema();
+    await sprecherModule.ensureSchema();
     const schemas = ['Submission', authz.enabled && 'Person', process.env.VAULT_KEY && 'Secret', process.env.ANTHROPIC_API_KEY && 'ShellLog'].filter(Boolean);
     console.log(`        Schema (${schemas.join(' + ')}): ok`);
   } catch (e) {
