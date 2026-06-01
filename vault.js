@@ -120,5 +120,25 @@ export function setupVault(app, { odb, dbName, requireAdmin }) {
     catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  return { ensureSchema };
+  // Lädt alle Secrets aus dem Vault in process.env (nur wenn noch nicht gesetzt).
+  // Aufruf NACH OrientDB-Verbindung — überschreibt .env-Werte NICHT (explizit
+  // gesetzte .env-Values haben Vorrang), ergänzt aber fehlende.
+  async function loadIntoEnv() {
+    try {
+      const rows = await listSecrets();
+      let loaded = 0;
+      for (const row of rows) {
+        if (process.env[row.name] !== undefined) continue; // .env hat Vorrang
+        try {
+          const full = await getSecret(row.name);
+          if (full?.value) { process.env[row.name] = full.value; loaded++; }
+        } catch { /* einzelner Secret kaputt -> überspringen */ }
+      }
+      if (loaded > 0) console.log(`        Vault: ${loaded} Secret${loaded !== 1 ? 's' : ''} in env geladen`);
+    } catch (e) {
+      console.error(`  ! Vault-env-Load fehlgeschlagen: ${e.message}`);
+    }
+  }
+
+  return { ensureSchema, loadIntoEnv };
 }

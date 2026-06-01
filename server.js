@@ -570,7 +570,10 @@ export async function startServer() {
   try {
     await ensureSubmissionSchema();
     if (authz.enabled) await authz.ensurePersonSchema();
-    if (process.env.VAULT_KEY) await vaultModule.ensureSchema();
+    if (process.env.VAULT_KEY) {
+      await vaultModule.ensureSchema();
+      await vaultModule.loadIntoEnv(); // Vault-Secrets → process.env (ergänzt fehlende)
+    }
     if (process.env.ANTHROPIC_API_KEY) await shellLogModule.ensureSchema();
     const schemas = ['Submission', authz.enabled && 'Person', process.env.VAULT_KEY && 'Secret', process.env.ANTHROPIC_API_KEY && 'ShellLog'].filter(Boolean);
     console.log(`        Schema (${schemas.join(' + ')}): ok`);

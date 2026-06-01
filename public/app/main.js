@@ -8,13 +8,14 @@ import { initWizard, openWizard } from '../features/class-wizard.js';
 import { initTunnels, activateTunnels, deactivateTunnels } from '../tools/tunnels.js';
 import { initSubmissions, activateSubmissions, deactivateSubmissions } from '../tools/submissions.js';
 import { initFriends, activateFriends, deactivateFriends } from '../tools/friends.js';
+import { initVaultUi, activateVaultUi, deactivateVaultUi } from '../tools/vault-ui.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
 import { initAuth, isAdmin } from '../auth/gate.js';
 
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
 // ----------------------------------------------------------------
-const TOOLS = ['orientdb', 'tunnels', 'submissions', 'friends', 'projects', 'funkner', 'willkommen'];
+const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'funkner', 'willkommen'];
 
 function switchTool(name) {
   const fallback = isAdmin() ? 'orientdb' : 'willkommen';
@@ -30,6 +31,8 @@ function switchTool(name) {
   else                    deactivateTunnels();
   if (name === 'submissions') activateSubmissions();
   else                        deactivateSubmissions();
+  if (name === 'vault')   activateVaultUi();
+  else                    deactivateVaultUi();
   if (name === 'friends') activateFriends();
   else                    deactivateFriends();
   if (name === 'projects' || name === 'funkner') activateEmbed(name);
@@ -134,6 +137,7 @@ async function bootstrap() {
 
     initTunnels();
     initSubmissions();
+    initVaultUi();
     initFriends();
     initEmbeds();
 
