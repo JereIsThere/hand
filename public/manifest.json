@@ -1,0 +1,16 @@
+{
+  "name": "Die Hand",
+  "short_name": "Hand",
+  "description": "Tool-Shell für den Freundeskreis — sprecher, Vault, Admin",
+  "start_url": "/#sprecher",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#06000e",
+  "theme_color": "#06000e",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["productivity", "utilities"],
+  "lang": "de"
+}
