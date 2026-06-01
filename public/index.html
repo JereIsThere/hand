@@ -30,6 +30,10 @@
         <span class="sb-icon">📥</span>
         <span class="sb-label">Submissions</span>
       </button>
+      <button class="sb-item" data-tool="vault" data-role="admin">
+        <span class="sb-icon">🔑</span>
+        <span class="sb-label">Vault</span>
+      </button>
       <button class="sb-item" data-tool="friends" data-role="admin">
         <span class="sb-icon">🤝</span>
         <span class="sb-label">Freunde</span>
@@ -217,6 +221,76 @@
         </div>
       </div>
     </section>
+
+    <!-- =========================================================
+         TOOL · Vault (verschlüsselter Secret-Speicher)
+         ========================================================= -->
+    <section class="tool" id="tool-vault">
+      <header class="topbar">
+        <div class="brand"><h1>Vault</h1></div>
+        <div class="status">
+          <span class="dot" id="vault-dot"></span>
+          <span id="vault-status-text">—</span>
+        </div>
+      </header>
+      <div class="tool-body">
+        <div class="panel-head">
+          <div class="controls">
+            <input id="vault-search" type="search" placeholder="suchen …" style="width:220px;" />
+            <button class="btn ghost" id="vault-reload">↻ neu laden</button>
+            <span class="spacer"></span>
+            <button class="btn" id="vault-new">+ Secret</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="vault-table">
+            <thead>
+              <tr><th>Name</th><th>Service</th><th>Beschreibung</th><th>Aktualisiert</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Vault-Modal -->
+    <div class="wizard" id="vault-modal" aria-hidden="true">
+      <div class="wizard-shell" style="width:min(580px,100%);">
+        <header class="wizard-head">
+          <div>
+            <small class="muted">Vault</small>
+            <h3 id="vault-modal-title">Neues Secret</h3>
+          </div>
+          <button class="btn ghost" id="vault-modal-close">✕</button>
+        </header>
+        <div class="wizard-body">
+          <div class="field"><label><span>Name</span><span class="type-tag">KEY_NAME</span></label>
+            <input id="vm-name" placeholder="z.B. ANTHROPIC_API_KEY" autocomplete="off" /></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="field"><label><span>Service</span><span class="type-tag">optional</span></label>
+              <input id="vm-service" placeholder="anthropic / google / …" /></div>
+            <div class="field"><label><span>Beschreibung</span><span class="type-tag">optional</span></label>
+              <input id="vm-desc" placeholder="wofür" /></div>
+          </div>
+          <div class="field">
+            <label>
+              <span>Wert</span>
+              <button class="btn ghost" id="vm-reveal-btn" style="padding:2px 8px;font-size:12px;">👁 anzeigen</button>
+            </label>
+            <textarea id="vm-value" rows="4" spellcheck="false"
+              placeholder="API-Key, Token, Private Key …"
+              style="font-family:monospace;font-size:13px;"></textarea>
+          </div>
+        </div>
+        <footer class="wizard-foot">
+          <button class="btn ghost" id="vault-modal-cancel">abbrechen</button>
+          <span class="spacer"></span>
+          <button class="btn danger hidden" id="vault-modal-delete">löschen</button>
+          <button class="btn" id="vault-modal-save">speichern</button>
+        </footer>
+      </div>
+      <div class="wizard-backdrop" id="vault-modal-backdrop"></div>
+    </div>
 
     <!-- =========================================================
          TOOL · Freunde (Admin: Zugang verwalten)
