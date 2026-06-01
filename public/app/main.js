@@ -10,14 +10,15 @@ import { initSubmissions, activateSubmissions, deactivateSubmissions } from '../
 import { initFriends, activateFriends, deactivateFriends } from '../tools/friends.js';
 import { initVaultUi, activateVaultUi, deactivateVaultUi } from '../tools/vault-ui.js';
 import { initSprecher, activateSprecher, deactivateSprecher } from '../tools/sprecher.js';
+import { initUeber, activateUeber, deactivateUeber } from '../tools/ueber.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
-import { initAuth, isAdmin } from '../auth/gate.js';
+import { initAuth, isAdmin, me } from '../auth/gate.js';
 import { checkAndShowSetupWizard, initSetupButton } from '../auth/setup.js';
 
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
 // ----------------------------------------------------------------
-const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'funkner', 'sprecher', 'willkommen'];
+const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'funkner', 'sprecher', 'ueber', 'willkommen'];
 
 function switchTool(name) {
   const fallback = isAdmin() ? 'orientdb' : 'willkommen';
@@ -35,6 +36,8 @@ function switchTool(name) {
   else                        deactivateSubmissions();
   if (name === 'sprecher') activateSprecher();
   else                     deactivateSprecher();
+  if (name === 'ueber')   activateUeber();
+  else                    deactivateUeber();
   if (name === 'vault')   activateVaultUi();
   else                    deactivateVaultUi();
   if (name === 'friends') activateFriends();
@@ -122,6 +125,32 @@ async function bootstrap() {
   $$('.sb-item').forEach(b => b.addEventListener('click', () => switchTool(b.dataset.tool)));
 
   initSetupButton();
+  initUeber();
+
+  // Profil-Widget
+  const user = me();
+  if (user) {
+    const nameEl = document.getElementById('profile-name');
+    const roleEl = document.getElementById('profile-role');
+    const avatarEl = document.getElementById('profile-avatar');
+    if (nameEl) nameEl.textContent = user.name || user.email || 'Nutzer';
+    if (roleEl) roleEl.textContent = user.role === 'admin' ? 'arm · admin' : 'freund';
+    if (avatarEl && user.picture) {
+      avatarEl.innerHTML = `<img src="${user.picture}" style="width:28px;height:28px;border-radius:50%;" />`;
+    } else if (avatarEl) {
+      avatarEl.textContent = (user.name || user.email || '?')[0].toUpperCase();
+    }
+  }
+  const footLabel = document.getElementById('sidebar-foot-label');
+  if (footLabel) footLabel.textContent = 'v0.8 · hand.jeremias-groehl.de';
+  document.getElementById('profile-widget')?.addEventListener('click', (e) => {
+    if (!e.target.closest('#profile-logout')) switchTool('ueber');
+  });
+  document.getElementById('profile-logout')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
+    location.href = '/';
+  });
 
   if (isAdmin()) {
     // Setup-Wizard beim ersten Start wenn Keys fehlen

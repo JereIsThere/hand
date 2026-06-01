@@ -62,8 +62,21 @@
         <span class="sb-ext" title="extern eingebettet">↗</span>
       </button>
     </nav>
-    <div class="sidebar-foot">
-      <small class="muted" id="sidebar-foot-label">v0.5 · localhost:3737</small>
+      <button class="sb-item" data-tool="ueber">
+        <span class="sb-icon">📍</span>
+        <span class="sb-label">Über / Roadmap</span>
+      </button>
+    </nav>
+    <div class="sidebar-foot" style="padding:10px 12px;border-top:1px solid #1d1330;">
+      <div id="profile-widget" style="display:flex;align-items:center;gap:9px;cursor:pointer;" title="Profil / Abmelden">
+        <div id="profile-avatar" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#00d4c8,#d4a200);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">?</div>
+        <div style="flex:1;min-width:0;">
+          <div id="profile-name" style="font-size:12px;font-weight:600;color:#e8e0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">…</div>
+          <div id="profile-role" style="font-size:10px;color:#6f6488;"></div>
+        </div>
+        <button id="profile-logout" style="background:none;border:none;color:#6f6488;cursor:pointer;font-size:14px;padding:0;" title="abmelden">⏏</button>
+      </div>
+      <small class="muted" id="sidebar-foot-label" style="display:block;margin-top:6px;font-size:10px;"></small>
     </div>
   </aside>
 
@@ -239,6 +252,19 @@
          ========================================================= -->
     <section class="tool" id="tool-sprecher" style="padding:0;overflow:hidden;">
       <div id="sprecher-root" style="display:flex;height:100%;"></div>
+    </section>
+
+    <!-- =========================================================
+         TOOL · Über / Roadmap
+         ========================================================= -->
+    <section class="tool" id="tool-ueber">
+      <header class="topbar">
+        <div class="brand"><h1>Über · Roadmap</h1></div>
+        <div class="status"><span style="font-size:12px;color:#6f6488;">Begin of Real Use 🚀</span></div>
+      </header>
+      <div class="tool-body" style="padding:24px;max-width:720px;overflow-y:auto;">
+        <div id="ueber-content"></div>
+      </div>
     </section>
 
     <!-- =========================================================
