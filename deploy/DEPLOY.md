@@ -110,6 +110,39 @@ SSH → fetch/reset → `npm ci --omit=dev` → `systemctl restart hand`). Vorau
 3. Der Server-Checkout (`/var/lib/deploy/hand`) muss gegen GitHub authentifiziert
    sein (Clone hat ja geklappt → `git fetch` als deploy-User muss laufen).
 
+## 🧪 DEV-Instanz (test.jeremias-groehl.de)
+
+Zweite Instanz auf Port 3001, eigener Checkout `/var/lib/deploy/hand-dev`,
+eigene `.env`. Deployt automatisch jeden Push auf einen `claude/**`- oder
+`dev`-Branch (`.github/workflows/deploy-dev.yml`) — Live-Vorschau zum Testen.
+
+**Einmaliges Setup auf dem Server:**
+
+```bash
+# eigener Checkout
+sudo -u deploy git clone https://github.com/JereIsThere/hand.git /var/lib/deploy/hand-dev
+cd /var/lib/deploy/hand-dev && sudo -u deploy npm ci --omit=dev
+sudo -u deploy cp .env /var/lib/deploy/hand-dev/.env   # oder eigene Test-.env
+
+# systemd-Service (Port 3001)
+sudo cp deploy/hand-dev.service /etc/systemd/system/hand-dev.service
+sudo systemctl daemon-reload && sudo systemctl enable --now hand-dev
+
+# sudoers: deploy darf hand-dev neu starten
+echo 'deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart hand-dev' | sudo tee /etc/sudoers.d/deploy-hand-dev
+sudo chmod 440 /etc/sudoers.d/deploy-hand-dev
+
+# nginx + HTTPS
+sudo cp deploy/nginx-test.conf /etc/nginx/sites-available/hand-test
+sudo ln -s /etc/nginx/sites-available/hand-test /etc/nginx/sites-enabled/hand-test
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d test.jeremias-groehl.de
+```
+
+Danach: Push auf einen `claude/**`-Branch → DEV-Workflow zieht ihn auf
+`test.jeremias-groehl.de`. Eigener OAuth-Redirect für die Subdomain im
+Google-Client ergänzen: `https://test.jeremias-groehl.de/auth/callback`.
+
 ## Alternative: docker-compose
 
 Statt systemd kann hand auch über das `docker-compose.yml` im

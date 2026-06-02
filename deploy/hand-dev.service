@@ -1,0 +1,29 @@
+# systemd-Unit für die Die-Hand DEV-Instanz (Port 3001).
+# Eigener Checkout /var/lib/deploy/hand-dev, eigene .env (z.B. eigene Test-DB).
+# Ziel: /etc/systemd/system/hand-dev.service
+#
+#   sudo cp deploy/hand-dev.service /etc/systemd/system/hand-dev.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hand-dev
+#   journalctl -u hand-dev -f
+
+[Unit]
+Description=Die Hand — DEV (Express, Port 3001)
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/var/lib/deploy/hand-dev
+Environment=PORT=3001
+ExecStart=/var/lib/deploy/.local/node/bin/node server.js
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
