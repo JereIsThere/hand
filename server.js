@@ -583,7 +583,7 @@ export async function startServer() {
   // ersten erfolgreichen Boot mit Verbindung).
   try {
     await ensureSubmissionSchema();
-    if (authz.enabled) await authz.ensurePersonSchema();
+    if (authz.enabled) { await authz.ensurePersonSchema(); await authz.ensureInviteSchema(); }
     if (process.env.VAULT_KEY) {
       await vaultModule.ensureSchema();
       await vaultModule.loadIntoEnv(); // Vault-Secrets → process.env (ergänzt fehlende)
