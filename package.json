@@ -1,6 +1,6 @@
 {
   "name": "hand",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "type": "module",
   "description": "Die Hand — Tool-Management-Shell (Slug: hand). Tools: OrientDB-Admin, SSH-Tunnel, Auge-Submissions.",
@@ -36,11 +36,15 @@
       "buildResources": "build"
     },
     "files": [
-      "electron/**",
-      "node_modules/electron-updater/**",
-      "server.js",
-      "public/**",
-      "package.json"
+      "**/*",
+      "!dist/**",
+      "!.github/**",
+      "!deploy/**",
+      "!scripts/zettel/**",
+      "!build/**",
+      "!*.log",
+      "!.env*",
+      "!tunnels.json"
     ],
     "publish": {
       "provider": "github",
