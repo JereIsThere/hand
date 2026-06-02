@@ -367,7 +367,57 @@ export function showSetupWizard(status, force = false) {
       el('h4', { style: 'font-size:14px; font-weight:600; margin-bottom:10px; color:#fff;' }, 'Update-Status'),
       updateInfoEl,
       el('div', { style: 'margin-top:14px;' }, checkBtn)
-    )
+    ),
+    (() => {
+      const list = el('div', { id: 'update-history-list', style: 'display:flex; flex-direction:column; gap:10px;' },
+        el('div', { style: 'font-size:12px; color:#6f6488;' }, 'Lade Verlauf…')
+      );
+      fetch('https://api.github.com/repos/JereIsThere/hand/releases?per_page=20')
+        .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+        .then(releases => {
+          list.innerHTML = '';
+          if (!releases.length) {
+            list.appendChild(el('div', { style: 'font-size:12px; color:#6f6488;' }, 'Keine Releases gefunden.'));
+            return;
+          }
+          for (const r of releases) {
+            const date = new Date(r.published_at || r.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const isPre = r.prerelease;
+            const tagBadge = el('span', {
+              style: `font-size:10px; padding:2px 8px; border-radius:10px; font-weight:600; letter-spacing:.5px; ${isPre ? 'background:#3a2860; color:#d4b8ff;' : 'background:#1a3a2e; color:#7de3a8;'}`
+            }, isPre ? 'BETA' : 'STABLE');
+            const header = el('div', { style: 'display:flex; align-items:center; justify-content:space-between; gap:8px;' },
+              el('div', { style: 'display:flex; align-items:center; gap:8px;' },
+                el('strong', { style: 'color:#fff; font-size:13px;' }, r.tag_name),
+                tagBadge
+              ),
+              el('span', { style: 'font-size:11px; color:#6f6488;' }, date)
+            );
+            const body = (r.body || '').trim();
+            const notes = body
+              ? el('pre', {
+                  style: 'margin:6px 0 0; font-family:inherit; font-size:11px; color:#9a8fb5; white-space:pre-wrap; line-height:1.5; max-height:120px; overflow:auto;'
+                }, body.length > 600 ? body.slice(0, 600) + '…' : body)
+              : null;
+            const item = el('div', {
+              style: 'border:1px solid #1d1330; border-radius:8px; padding:10px 12px; background:rgba(255,255,255,.02);'
+            }, header);
+            if (notes) item.appendChild(notes);
+            list.appendChild(item);
+          }
+        })
+        .catch(err => {
+          list.innerHTML = '';
+          list.appendChild(el('div', { style: 'font-size:12px; color:#ff8080;' }, 'Verlauf konnte nicht geladen werden: ' + err.message));
+        });
+      return el('div', { class: 'update-channel-card' },
+        el('h4', { style: 'font-size:14px; font-weight:600; margin-bottom:10px; color:#fff;' }, 'Versions-Verlauf'),
+        el('p', { style: 'font-size:12px; color:#9a8fb5; margin-bottom:14px; line-height:1.5;' },
+          'Liste aller veröffentlichten Versionen aus GitHub. Stable und Beta gemischt.'
+        ),
+        list
+      );
+    })()
   );
 
   // Updates-Listener registrieren
