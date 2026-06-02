@@ -23,7 +23,7 @@ jobs:
           script_stop: true
           script: |
             set -e
-            export PATH="$PATH:/usr/local/bin:/usr/bin"
+            export PATH="/var/lib/deploy/.local/node/bin:$PATH:/usr/local/bin:/usr/bin"
             cd /var/lib/deploy/hand
             git fetch --all --quiet
             git reset --hard origin/main
