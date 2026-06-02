@@ -3,7 +3,8 @@
 // Web-Shell in einem nativen Fenster. server.js bleibt unverändert headless
 // nutzbar (npm start / docker-compose).
 import { app, BrowserWindow, Menu, shell, ipcMain } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import electronUpdater from 'electron-updater';
+const { autoUpdater } = electronUpdater;
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
