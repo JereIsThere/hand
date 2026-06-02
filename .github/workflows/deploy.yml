@@ -27,7 +27,7 @@ jobs:
             cd /var/lib/deploy/hand
             git fetch --all --quiet
             git reset --hard origin/main
-            pnpm install --prod --frozen-lockfile
+            npm ci --omit=dev
             sudo systemctl restart hand
             systemctl is-active hand
             echo "deployed: $(git rev-parse --short HEAD)"
