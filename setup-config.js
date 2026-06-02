@@ -5,33 +5,6 @@
 
 export const SETUP_KEYS = [
   {
-    key: 'ANTHROPIC_API_KEY',
-    label: 'Anthropic API Key',
-    service: 'anthropic',
-    description: 'Für die AI Shell (Haiku-Analyse) und sprecher (Chat). Auf console.anthropic.com.',
-    placeholder: 'sk-ant-api03-…',
-    secret: true,
-    group: 'KI',
-  },
-  {
-    key: 'GROK_API_KEY',
-    label: 'Grok / xAI API Key',
-    service: 'xai',
-    description: 'Für Grok 3 / Grok 3 Mini in sprecher. Auf console.x.ai.',
-    placeholder: 'xai-…',
-    secret: true,
-    group: 'KI',
-  },
-  {
-    key: 'N8N_IMAGE_WEBHOOK',
-    label: 'n8n Image-Webhook',
-    service: 'n8n',
-    description: 'URL des n8n-Workflows für /image-Generierung (Flux / DALL-E) in sprecher.',
-    placeholder: 'https://n8n.jeremias-groehl.de/webhook/image-gen',
-    secret: false,
-    group: 'Auge',
-  },
-  {
     key: 'N8N_BUILD_WEBHOOK',
     label: 'n8n Build-Webhook',
     service: 'n8n',
