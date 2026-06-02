@@ -1,0 +1,73 @@
+name: Build & Publish Hand Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag oder Branch zum Bauen'
+        required: false
+        default: 'main'
+
+concurrency:
+  group: hand-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Determine release type
+        id: relmeta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "channel=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+            echo "publish=always" >> "$GITHUB_OUTPUT"
+          else
+            BASE=$(node -p "require('./package.json').version")
+            SHORT_SHA=${GITHUB_SHA::7}
+            BETA_VERSION="${BASE}-beta.${{ github.run_number }}+${SHORT_SHA}"
+            echo "channel=beta" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "version=${BETA_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "publish=always" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version (beta only)
+        if: steps.relmeta.outputs.channel == 'beta'
+        shell: bash
+        run: |
+          node -e "const fs=require('fs');const p=require('./package.json');p.version='${{ steps.relmeta.outputs.version }}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build & publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EP_PRE_RELEASE: ${{ steps.relmeta.outputs.prerelease }}
+        run: |
+          npx electron-builder --win nsis --publish always \
+            --config.publish.channel=${{ steps.relmeta.outputs.channel }}
