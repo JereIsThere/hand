@@ -1,0 +1,38 @@
+name: Deploy hand (DEV)
+
+# Deployt jeden Push auf einen claude/**-Branch auf die DEV-Instanz
+# (test.jeremias-groehl.de, Port 3001) — Live-Vorschau zum Testen.
+
+on:
+  push:
+    branches: ['claude/**', 'dev']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hand-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH -> checkout branch, install, restart dev
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            export PATH="/var/lib/deploy/.local/node/bin:$PATH:/usr/local/bin:/usr/bin"
+            BRANCH="${{ github.ref_name }}"
+            cd /var/lib/deploy/hand-dev
+            git fetch --all --quiet
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+            git reset --hard "origin/$BRANCH"
+            npm ci --omit=dev
+            sudo systemctl restart hand-dev
+            systemctl is-active hand-dev
+            echo "DEV deployed: $BRANCH @ $(git rev-parse --short HEAD)"
