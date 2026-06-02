@@ -55,7 +55,28 @@ async function createWindow(port) {
     return { action: 'deny' };
   });
 
+  // DevTools auch in der gepackten App: F12 oder Ctrl/Cmd+Shift+I togglen,
+  // Ctrl/Cmd+R neu laden. So lassen sich Fehler (z.B. weißes/schwarzes Fenster)
+  // direkt in der Konsole sehen.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const mod = input.control || input.meta;
+    if (input.key === 'F12' || (mod && input.shift && input.key.toLowerCase() === 'i')) {
+      win.webContents.toggleDevTools();
+      event.preventDefault();
+    } else if (mod && input.key.toLowerCase() === 'r') {
+      win.webContents.reload();
+      event.preventDefault();
+    }
+  });
+
   await win.loadURL(`http://127.0.0.1:${port}`);
+
+  // Bei Lade-Fehler (Server nicht erreichbar o.ä.) DevTools aufmachen statt schwarz.
+  win.webContents.on('did-fail-load', (e, code, desc) => {
+    console.error(`Laden fehlgeschlagen (${code}): ${desc}`);
+    win.webContents.openDevTools({ mode: 'detach' });
+  });
 }
 
 app.on('second-instance', () => {
