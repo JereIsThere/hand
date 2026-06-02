@@ -61,8 +61,10 @@ function md(text) {
 let sessions = [];
 let currentSid = null;
 let currentMessages = [];
-let currentModel = 'claude-sonnet-4-6';
-let availableModels = [];
+let currentMode = 'text';
+let currentFamily = '';
+let currentModel = '';
+let availableModels = { text: [], image: [], video: [] };
 let pendingAttachments = [];
 let streaming = false;
 let root = null;
@@ -103,10 +105,11 @@ function renderShell() {
   .sp-sess:hover .sp-sess-del{opacity:1;}
   .sp-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
   .sp-topbar{padding:10px 16px;border-bottom:1px solid #1d1330;display:flex;align-items:center;gap:10px;}
-  .sp-title{font-family:Georgia,serif;font-size:15px;font-weight:600;flex:1;cursor:pointer;color:#e8e0f0;}
-  .sp-title:hover{color:#00d4c8;}
+  .sp-title{font-family:Georgia,serif;font-size:15px;font-weight:600;flex:1;cursor:pointer;color:#e8e0f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .sp-model-sel{background:#0e0820;border:1px solid #2a1d44;color:#9a8fb5;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;}
   .sp-model-sel:focus{outline:none;border-color:#00d4c8;}
+  .sp-mode-label.active {background:linear-gradient(90deg,#00d4c8,#d4a200);color:#06000e !important;font-weight:700;}
+  .sp-mode-label:not(.active):hover {color:#e8e0f0 !important;background:#1d1330;}
   .sp-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}
   .sp-msg{display:flex;gap:10px;max-width:100%;}
   .sp-msg.user{flex-direction:row-reverse;}
@@ -160,9 +163,26 @@ function renderShell() {
 </div>
 
 <div class="sp-main">
-  <div class="sp-topbar">
+  <div class="sp-topbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <div class="sp-title" id="sp-title" title="Umbenennen">Neues Gespräch</div>
-    <select class="sp-model-sel" id="sp-model-sel"></select>
+    
+    <div class="sp-mode-selector" style="display:flex;background:#0d011c;border:1px solid #2a1d44;border-radius:20px;padding:2px;">
+      <label class="sp-mode-label active" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
+        <input type="radio" name="sp-mode" value="text" checked style="display:none;">
+        <span>📝 Text</span>
+      </label>
+      <label class="sp-mode-label" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
+        <input type="radio" name="sp-mode" value="image" style="display:none;">
+        <span>🖼️ Bild</span>
+      </label>
+      <label class="sp-mode-label" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
+        <input type="radio" name="sp-mode" value="video" style="display:none;">
+        <span>🎬 Video</span>
+      </label>
+    </div>
+
+    <select class="sp-model-sel" id="sp-family-sel" style="background:#0e0820;border:1px solid #2a1d44;color:#9a8fb5;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;"></select>
+    <select class="sp-model-sel" id="sp-model-sel" style="background:#0e0820;border:1px solid #2a1d44;color:#9a8fb5;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;"></select>
   </div>
   <div class="sp-messages" id="sp-messages">
     <div class="sp-empty">
@@ -175,13 +195,14 @@ function renderShell() {
     <div class="sp-attach-prev" id="sp-attach-prev" style="display:none;"></div>
     <div class="sp-input-row">
       <button class="sp-attach-btn" id="sp-attach-btn" title="Bild anhängen (oder einfach einfügen)">📎</button>
-      <textarea class="sp-input" id="sp-input" rows="1" placeholder="Nachricht … /image [prompt] für Bildgenerierung"></textarea>
+      <textarea class="sp-input" id="sp-input" rows="1" placeholder="Nachricht …"></textarea>
       <button class="sp-send" id="sp-send">Senden</button>
     </div>
   </div>
 </div>
 <input type="file" id="sp-file-input" accept="image/*" style="display:none;" multiple>
 `;
+}
 }
 
 // ── Sessions-Sidebar ──────────────────────────────────────────────────
@@ -215,28 +236,71 @@ function renderSessionList() {
 }
 
 // ── Modell-Selector ───────────────────────────────────────────────────
-function renderModelSelector() {
-  const sel = root.querySelector('#sp-model-sel');
-  sel.innerHTML = '';
-  const groups = { 'Claude': [], 'Grok': [], 'Sonstige': [] };
-  for (const m of availableModels) {
-    const grp = m.provider === 'anthropic' ? 'Claude' : m.provider === 'xai' ? 'Grok' : 'Sonstige';
-    groups[grp].push(m);
+function updateDropdowns() {
+  const list = availableModels[currentMode] || [];
+  const families = [...new Set(list.map(m => m.family))];
+  
+  const familySel = root.querySelector('#sp-family-sel');
+  familySel.innerHTML = '';
+  
+  if (!families.includes(currentFamily)) {
+    currentFamily = families[0] || '';
   }
-  for (const [name, models] of Object.entries(groups)) {
-    if (!models.length) continue;
-    const og = el('optgroup', { label: name });
-    for (const m of models) {
-      const opt = el('option', {
-        value: m.id,
-        ...(m.id === currentModel ? { selected: true } : {}),
-        ...(!m.available ? { disabled: true } : {}),
-      }, m.label + (!m.available ? ' (kein Key)' : ''));
-      og.append(opt);
+  
+  for (const fam of families) {
+    const opt = el('option', { value: fam, selected: fam === currentFamily }, fam.toUpperCase());
+    familySel.append(opt);
+  }
+  
+  const modelSel = root.querySelector('#sp-model-sel');
+  modelSel.innerHTML = '';
+  
+  const familyModels = list.filter(m => m.family === currentFamily);
+  if (familyModels.length > 0) {
+    const modelExists = familyModels.some(m => m.id === currentModel);
+    if (!modelExists) {
+      currentModel = familyModels[0].id;
     }
-    sel.append(og);
+  } else {
+    currentModel = '';
   }
-  sel.onchange = () => { currentModel = sel.value; };
+  
+  for (const m of familyModels) {
+    const opt = el('option', { value: m.id, selected: m.id === currentModel }, m.label);
+    modelSel.append(opt);
+  }
+}
+
+function updateModeUI() {
+  root.querySelectorAll('.sp-mode-label').forEach(label => {
+    const checked = label.querySelector('input').checked;
+    if (checked) label.classList.add('active');
+    else label.classList.remove('active');
+  });
+  
+  const inp = root.querySelector('#sp-input');
+  if (currentMode === 'text') inp.placeholder = 'Nachricht … /image [prompt]';
+  else if (currentMode === 'image') inp.placeholder = 'Bildbeschreibung (Prompt) …';
+  else if (currentMode === 'video') inp.placeholder = 'Videobeschreibung (Prompt) …';
+}
+
+function restoreModel(modelId) {
+  if (!modelId) return;
+  for (const [mode, list] of Object.entries(availableModels)) {
+    const m = list.find(x => x.id === modelId);
+    if (m) {
+      currentMode = mode;
+      currentFamily = m.family;
+      currentModel = modelId;
+      const radio = root.querySelector(`input[name="sp-mode"][value="${mode}"]`);
+      if (radio) {
+        radio.checked = true;
+      }
+      updateModeUI();
+      updateDropdowns();
+      break;
+    }
+  }
 }
 
 // ── Messages ──────────────────────────────────────────────────────────
@@ -275,6 +339,12 @@ function appendMsgEl(m, streaming = false) {
     const img = el('img', { src: m.imageUrl, class: 'sp-img-resp', alt: 'generiertes Bild', onclick: () => window.open(m.imageUrl, '_blank') });
     bubble.append(img);
     if (m.content) bubble.prepend(el('div', { class: 'sp-meta', style: 'margin-bottom:4px;' }, '/image ' + m.content));
+  } else if (m.type === 'video' && m.imageUrl) {
+    const video = el('video', { src: m.imageUrl, controls: true, class: 'sp-img-resp', style: 'max-width:100%;border-radius:10px;margin-top:6px;display:block;' });
+    bubble.append(video);
+    if (m.content) bubble.prepend(el('div', { class: 'sp-meta', style: 'margin-bottom:4px;' }, 'Video: ' + m.content));
+  } else if (m.type === 'video-pending') {
+    bubble.innerHTML = `<div class="sp-typing" style="margin-bottom:4px;">🎬 <span></span><span></span><span></span></div><div style="font-size:12px;color:#9a8fb5;">${escHtml(m.content)}</div>`;
   } else if (streaming) {
     bubble.innerHTML = '<div class="sp-typing"><span></span><span></span><span></span></div>';
     bubble.dataset.streaming = '1';
@@ -347,9 +417,10 @@ async function loadSession(sid) {
     const { session, messages } = await api.getSession(sid);
     currentSid = sid;
     currentMessages = messages || [];
-    currentModel = session.model || currentModel;
     root.querySelector('#sp-title').textContent = session.title || 'Neues Gespräch';
-    root.querySelector('#sp-model-sel').value = currentModel;
+    
+    restoreModel(session.model);
+    
     renderSessionList();
     renderMessages();
   } catch (e) { toast('Session laden: ' + e.message, 'fail'); }
@@ -373,12 +444,12 @@ async function sendMessage() {
     renderSessionList();
   }
 
-  // /image-Kommando
+  // /image-Kommando (Legacy im Textmodus oder Bild-Modus)
   const imageMatch = text.match(/^\/image\s+(.+)/i);
-  if (imageMatch) {
+  if (currentMode === 'image' || imageMatch) {
     input.value = '';
-    const prompt = imageMatch[1];
-    const userMsg = { role: 'user', content: '/image ' + prompt, type: 'text', model: '' };
+    const prompt = imageMatch ? imageMatch[1] : text;
+    const userMsg = { role: 'user', content: (imageMatch ? '' : 'Bild: ') + prompt, type: 'text', model: '' };
     currentMessages.push(userMsg);
     appendMsgEl(userMsg);
     const streamDiv = appendMsgEl({ role: 'assistant', content: '', type: 'text', model: currentModel }, true);
@@ -388,19 +459,99 @@ async function sendMessage() {
       const r = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sid: currentSid, model: currentModel, imagePrompt: prompt }),
+        body: JSON.stringify({ sid: currentSid, model: currentModel, mode: 'image', prompt }),
       });
       const data = await r.json();
       const imgUrl = data.imageUrl || '';
       const bubble = streamDiv.querySelector('.sp-bubble');
       if (bubble) bubble.innerHTML = imgUrl
-        ? `<div class="sp-meta" style="margin-bottom:4px;">/image ${escHtml(prompt)}</div><img src="${escHtml(imgUrl)}" class="sp-img-resp" onclick="window.open('${escHtml(imgUrl)}','_blank')">`
+        ? `<div class="sp-meta" style="margin-bottom:4px;">Bild: ${escHtml(prompt)}</div><img src="${escHtml(imgUrl)}" class="sp-img-resp" onclick="window.open('${escHtml(imgUrl)}','_blank')">`
         : `<span style="color:#ff8080">Kein Bild erhalten.</span>`;
       currentMessages.push({ role: 'assistant', content: prompt, type: 'image', model: currentModel, imageUrl: imgUrl });
     } catch (e) {
       const bubble = streamDiv.querySelector('.sp-bubble');
       if (bubble) bubble.innerHTML = `<span style="color:#ff8080">${escHtml(e.message)}</span>`;
     } finally {
+      streaming = false;
+      root.querySelector('#sp-send').disabled = false;
+    }
+    return;
+  }
+
+  // Video-Modus
+  if (currentMode === 'video') {
+    input.value = '';
+    const prompt = text;
+    const userMsg = { role: 'user', content: 'Video: ' + prompt, type: 'text', model: '' };
+    currentMessages.push(userMsg);
+    appendMsgEl(userMsg);
+    const streamDiv = appendMsgEl({ role: 'assistant', content: 'Video wird initialisiert...', type: 'video-pending', model: currentModel }, true);
+    streaming = true;
+    root.querySelector('#sp-send').disabled = true;
+    try {
+      const r = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sid: currentSid, model: currentModel, mode: 'video', prompt }),
+      });
+      if (!r.ok) {
+        const errData = await r.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${r.status}`);
+      }
+      const data = await r.json();
+      const requestId = data.request_id;
+      if (!requestId) throw new Error('Keine Request-ID erhalten');
+      
+      const bubble = streamDiv.querySelector('.sp-bubble');
+      bubble.innerHTML = `<div class="sp-typing" style="margin-bottom:4px;">🎬 <span></span><span></span><span></span></div><div style="font-size:12px;color:#9a8fb5;">Video wird generiert (ID: ${requestId})...</div>`;
+      
+      // Start polling
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const statusRes = await fetch(`/api/video-status/${requestId}`);
+          if (!statusRes.ok) throw new Error(`Poll HTTP ${statusRes.status}`);
+          const statusData = await statusRes.json();
+          
+          if (statusData.status === 'done') {
+            clearInterval(poll);
+            const videoUrl = statusData.video?.url || statusData.url || '';
+            
+            // Persist message in database
+            await fetch(`/api/sessions/${currentSid}/messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role: 'assistant', content: prompt, type: 'video', model: currentModel, imageUrl: videoUrl }),
+            });
+            
+            // Push to local list and re-render
+            currentMessages.push({ role: 'assistant', content: prompt, type: 'video', model: currentModel, imageUrl: videoUrl });
+            renderMessages();
+            streaming = false;
+            root.querySelector('#sp-send').disabled = false;
+          } else if (statusData.status === 'failed' || statusData.status === 'expired') {
+            clearInterval(poll);
+            bubble.innerHTML = `<span style="color:#ff8080">Video-Generierung fehlgeschlagen: ${escHtml(statusData.error || 'Fehler')}</span>`;
+            streaming = false;
+            root.querySelector('#sp-send').disabled = false;
+          } else {
+            const statusTxt = statusData.status || 'generiert';
+            bubble.innerHTML = `<div class="sp-typing" style="margin-bottom:4px;">🎬 <span></span><span></span><span></span></div><div style="font-size:12px;color:#9a8fb5;">Video wird generiert (Status: ${statusTxt}, Versuch: ${attempts})...</div>`;
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+          if (attempts > 30) {
+            clearInterval(poll);
+            bubble.innerHTML = `<span style="color:#ff8080">Verbindung abgebrochen: ${escHtml(err.message)}</span>`;
+            streaming = false;
+            root.querySelector('#sp-send').disabled = false;
+          }
+        }
+      }, 5000);
+    } catch (e) {
+      const bubble = streamDiv.querySelector('.sp-bubble');
+      if (bubble) bubble.innerHTML = `<span style="color:#ff8080">${escHtml(e.message)}</span>`;
       streaming = false;
       root.querySelector('#sp-send').disabled = false;
     }
@@ -429,7 +580,7 @@ async function sendMessage() {
     renderSessionList();
   }
 
-  // API-Messages zusammenbauen (inkl. Bild-Attachments für Vision-Modelle)
+  // API-Messages zusammenbauen
   const apiMessages = currentMessages
     .filter(m => m.role === 'user' || m.role === 'assistant')
     .map(m => {
@@ -473,9 +624,9 @@ async function sendMessage() {
         const raw = line.slice(5).trim();
         try {
           const ev = JSON.parse(raw);
+          if (ev.done) break;
           if (ev.delta) { fullResponse += ev.delta; updateStreamingBubble(streamDiv, ev.delta); }
           if (ev.error) throw new Error(ev.error);
-          if (ev.done) break;
         } catch {}
       }
     }
@@ -530,12 +681,38 @@ export function initSprecher() {
   // Sessions + Modelle laden
   Promise.all([api.listSessions(), api.getModels()]).then(([sessData, modelData]) => {
     sessions = sessData.sessions || [];
-    availableModels = modelData.models || [];
+    availableModels = modelData || { text: [], image: [], video: [] };
     renderSessionList();
-    renderModelSelector();
+    
+    // Set defaults
+    currentMode = 'text';
+    currentFamily = availableModels.text?.[0]?.family || 'grok';
+    currentModel = availableModels.text?.[0]?.id || '';
+    
+    updateModeUI();
+    updateDropdowns();
   }).catch(() => {});
 
   // Events
+  root.querySelectorAll('input[name="sp-mode"]').forEach(radio => {
+    radio.onchange = () => {
+      currentMode = radio.value;
+      updateModeUI();
+      updateDropdowns();
+    };
+  });
+
+  const familySel = root.querySelector('#sp-family-sel');
+  familySel.onchange = () => {
+    currentFamily = familySel.value;
+    updateDropdowns();
+  };
+
+  const modelSel = root.querySelector('#sp-model-sel');
+  modelSel.onchange = () => {
+    currentModel = modelSel.value;
+  };
+
   root.querySelector('#sp-new').onclick = async () => {
     currentSid = null;
     currentMessages = [];

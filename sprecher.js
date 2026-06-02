@@ -1,19 +1,11 @@
 // sprecher — Chat-Backend für Die Hand.
 // Sessions + Messages in OrientDB. Chat-Proxy via SSE-Streaming.
-// Unterstützte Provider: Anthropic (Claude) + xAI (Grok).
-// Slash-Kommandos /image → N8N_IMAGE_WEBHOOK (n8n übernimmt Flux/DALL-E).
+// Migriert zu gehirn als API Provider.
 
 const sqlStr = (s) => `'${String(s == null ? '' : s).replace(/'/g, "''").slice(0, 8000)}'`;
 const safeId = (s) => String(s).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
 
-export const MODELS = [
-  { id: 'claude-sonnet-4-6',  label: 'Claude Sonnet 4.6',  provider: 'anthropic', fast: true },
-  { id: 'claude-opus-4-8',    label: 'Claude Opus 4.8',    provider: 'anthropic', smart: true },
-  { id: 'claude-haiku-4-5',   label: 'Claude Haiku 4.5',   provider: 'anthropic', cheap: true },
-  { id: 'grok-3',             label: 'Grok 3',             provider: 'xai', smart: true },
-  { id: 'grok-3-mini',        label: 'Grok 3 Mini',        provider: 'xai', fast: true },
-  { id: 'grok-3-fast',        label: 'Grok 3 Fast',        provider: 'xai' },
-];
+const GEHIRN_URL = process.env.GEHIRN_URL || 'http://localhost:4000';
 
 export function setupSprecher(app, { odb, dbName, requireAuth }) {
   const sql = (cmd) => odb(`/command/${dbName}/sql`, {
@@ -61,7 +53,7 @@ export function setupSprecher(app, { odb, dbName, requireAuth }) {
       const rid = String(existing['@rid']).replace(/[^0-9:#]/g, '');
       await sql(`UPDATE ${rid} SET title=${sqlStr(title||'')}, model=${sqlStr(model||'')}, updatedAt=${sqlStr(now)}`);
     } else {
-      await sql(`INSERT INTO SprecherSession SET sid=${sqlStr(sid)}, title=${sqlStr(title||'Neues Gespräch')}, model=${sqlStr(model||'claude-sonnet-4-6')}, systemPrompt=${sqlStr(systemPrompt||'')}, createdAt=${sqlStr(now)}, updatedAt=${sqlStr(now)}`);
+      await sql(`INSERT INTO SprecherSession SET sid=${sqlStr(sid)}, title=${sqlStr(title||'Neues Gespräch')}, model=${sqlStr(model||'')}, systemPrompt=${sqlStr(systemPrompt||'')}, createdAt=${sqlStr(now)}, updatedAt=${sqlStr(now)}`);
     }
   }
 
@@ -80,132 +72,6 @@ export function setupSprecher(app, { odb, dbName, requireAuth }) {
     await sql(`INSERT INTO SprecherMessage SET sid=${sqlStr(sid)}, role=${sqlStr(role)}, content=${sqlStr(content||'')}, type=${sqlStr(type||'text')}, model=${sqlStr(model||'')}, imageUrl=${sqlStr(imageUrl||'')}, ts=${sqlStr(ts)}`);
     // updatedAt der Session aktualisieren
     await sql(`UPDATE SprecherSession SET updatedAt=${sqlStr(ts.slice(0,19))} WHERE sid=${sqlStr(sid)}`);
-  }
-
-  // ── Chat-Proxy: Streaming SSE ─────────────────────────────────────────
-  async function streamAnthropic({ model, messages, systemPrompt, res }) {
-    const key = process.env.ANTHROPIC_API_KEY;
-    if (!key) throw new Error('ANTHROPIC_API_KEY nicht gesetzt');
-
-    const apiMsgs = messages.map(m => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: Array.isArray(m.content) ? m.content : [{ type: 'text', text: m.content || '' }],
-    })).filter(m => m.content.length);
-
-    const body = {
-      model,
-      max_tokens: 8192,
-      stream: true,
-      messages: apiMsgs,
-      ...(systemPrompt ? { system: systemPrompt } : {}),
-    };
-
-    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!upstream.ok) {
-      const err = await upstream.text();
-      throw new Error(`Anthropic ${upstream.status}: ${err.slice(0, 200)}`);
-    }
-
-    const reader = upstream.body.getReader();
-    const dec = new TextDecoder();
-    let full = '';
-    let buf = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.startsWith('data:')) continue;
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') continue;
-        try {
-          const ev = JSON.parse(data);
-          const delta = ev.delta?.text || ev.delta?.value || '';
-          if (delta) {
-            full += delta;
-            res.write(`data: ${JSON.stringify({ delta })}\n\n`);
-          }
-        } catch {}
-      }
-    }
-    return full;
-  }
-
-  async function streamXai({ model, messages, systemPrompt, res }) {
-    const key = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-    if (!key) throw new Error('GROK_API_KEY nicht gesetzt — im Vault anlegen');
-
-    const apiMsgs = [
-      ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-      ...messages.map(m => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content || '',
-      })),
-    ];
-
-    const upstream = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`,
-      },
-      body: JSON.stringify({ model, messages: apiMsgs, stream: true, max_tokens: 8192 }),
-    });
-    if (!upstream.ok) {
-      const err = await upstream.text();
-      throw new Error(`xAI ${upstream.status}: ${err.slice(0, 200)}`);
-    }
-
-    const reader = upstream.body.getReader();
-    const dec = new TextDecoder();
-    let full = '';
-    let buf = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.startsWith('data:')) continue;
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') continue;
-        try {
-          const ev = JSON.parse(data);
-          const delta = ev.choices?.[0]?.delta?.content || '';
-          if (delta) {
-            full += delta;
-            res.write(`data: ${JSON.stringify({ delta })}\n\n`);
-          }
-        } catch {}
-      }
-    }
-    return full;
-  }
-
-  // ── /image via n8n ────────────────────────────────────────────────────
-  async function requestImage({ prompt, sessionId, model }) {
-    const webhook = process.env.N8N_IMAGE_WEBHOOK;
-    if (!webhook) throw new Error('N8N_IMAGE_WEBHOOK nicht gesetzt — im Vault anlegen');
-    const r = await fetch(webhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, sessionId, model }),
-    });
-    if (!r.ok) throw new Error(`n8n image ${r.status}`);
-    return r.json();
   }
 
   // ── HTTP-Routen ───────────────────────────────────────────────────────
@@ -235,50 +101,129 @@ export function setupSprecher(app, { odb, dbName, requireAuth }) {
     catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/models', requireAuth(), (req, res) => {
-    const available = MODELS.map(m => ({
-      ...m,
-      available: m.provider === 'anthropic' ? !!process.env.ANTHROPIC_API_KEY
-        : !!(process.env.GROK_API_KEY || process.env.XAI_API_KEY),
-    }));
-    res.json({ models: available });
+  app.post('/api/sessions/:sid/messages', requireAuth(), async (req, res) => {
+    try {
+      const { role, content, type, model, imageUrl } = req.body || {};
+      await appendMessage({ sid: safeId(req.params.sid), role, content, type, model, imageUrl });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  // Streaming-Chat-Endpoint
+  app.get('/api/models', requireAuth(), async (req, res) => {
+    try {
+      const gRes = await fetch(`${GEHIRN_URL}/models`);
+      if (!gRes.ok) throw new Error(`Gehirn models: ${gRes.status}`);
+      const data = await gRes.json();
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/video-status/:id', requireAuth(), async (req, res) => {
+    try {
+      const gRes = await fetch(`${GEHIRN_URL}/gen/video/${req.params.id}`);
+      if (!gRes.ok) throw new Error(`Gehirn video status: ${gRes.status}`);
+      const data = await gRes.json();
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Streaming-Chat-Endpoint (proxied to gehirn)
   app.post('/api/chat', requireAuth(), async (req, res) => {
-    const { sid, model, messages, systemPrompt, imagePrompt } = req.body || {};
-    if (!sid || !model) return res.status(400).json({ error: 'sid + model erforderlich' });
+    const { sid, model, messages, systemPrompt, imagePrompt, mode, prompt } = req.body || {};
+    if (!sid) return res.status(400).json({ error: 'sid erforderlich' });
 
-    const modelDef = MODELS.find(m => m.id === model);
-    if (!modelDef) return res.status(400).json({ error: `Unbekanntes Modell: ${model}` });
-
-    // /image-Kommando → n8n, kein Streaming
-    if (imagePrompt) {
+    // Handle Image Generation (Bild-Modus oder Legacy /image-Kommando)
+    if (mode === 'image' || imagePrompt) {
+      const activePrompt = imagePrompt || prompt || messages?.[messages.length - 1]?.content;
+      if (!activePrompt) return res.status(400).json({ error: 'prompt erforderlich' });
       try {
-        const result = await requestImage({ prompt: imagePrompt, sessionId: sid, model });
-        const imageUrl = result.imageUrl || result.message?.imageUrl || '';
-        await appendMessage({ sid, role: 'assistant', content: imagePrompt, type: 'image', model, imageUrl });
-        return res.json({ type: 'image', imageUrl });
-      } catch (e) { return res.status(500).json({ error: e.message }); }
+        const gRes = await fetch(`${GEHIRN_URL}/gen/image`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: activePrompt, model }),
+        });
+        if (!gRes.ok) {
+          const errData = await gRes.json().catch(() => ({}));
+          throw new Error(errData?.error || `Gehirn error: ${gRes.status}`);
+        }
+        const data = await gRes.json();
+        const imageUrl = data.urls?.[0] || '';
+        await appendMessage({ sid, role: 'assistant', content: activePrompt, type: 'image', model: data.model, imageUrl });
+        return res.json({ type: 'image', imageUrl, model: data.model });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
     }
 
-    // Text-Chat → SSE-Streaming
+    // Handle Video Generation (Video-Modus)
+    if (mode === 'video') {
+      const activePrompt = prompt || messages?.[messages.length - 1]?.content;
+      if (!activePrompt) return res.status(400).json({ error: 'prompt erforderlich' });
+      try {
+        const gRes = await fetch(`${GEHIRN_URL}/gen/video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: activePrompt, model }),
+        });
+        if (!gRes.ok) {
+          const errData = await gRes.json().catch(() => ({}));
+          throw new Error(errData?.error || `Gehirn error: ${gRes.status}`);
+        }
+        const data = await gRes.json();
+        return res.json({ type: 'video', request_id: data.request_id, model: data.model });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Default: Text Chat (SSE Streaming proxied to gehirn)
+    if (!model) return res.status(400).json({ error: 'model erforderlich' });
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     try {
-      let full;
-      if (modelDef.provider === 'anthropic') {
-        full = await streamAnthropic({ model, messages, systemPrompt, res });
-      } else if (modelDef.provider === 'xai') {
-        full = await streamXai({ model, messages, systemPrompt, res });
-      } else {
-        throw new Error(`Unbekannter Provider: ${modelDef.provider}`);
+      const gRes = await fetch(`${GEHIRN_URL}/gen/text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, systemPrompt, stream: true }),
+      });
+      if (!gRes.ok) {
+        const errText = await gRes.text();
+        throw new Error(errText || `Gehirn error: ${gRes.status}`);
+      }
+
+      const reader = gRes.body.getReader();
+      const dec = new TextDecoder();
+      let full = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+
+        // Decode to extract text content for saving in OrientDB
+        const chunkText = dec.decode(value, { stream: true });
+        const lines = chunkText.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            const raw = line.slice(5).trim();
+            if (raw && raw !== '[DONE]') {
+              try {
+                const ev = JSON.parse(raw);
+                if (ev.delta) full += ev.delta;
+              } catch (e) {}
+            }
+          }
+        }
       }
       await appendMessage({ sid, role: 'assistant', content: full, type: 'text', model });
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     } catch (e) {
       res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`);
