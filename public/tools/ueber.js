@@ -31,7 +31,8 @@ const ROADMAP = [
     phase: '🚀 v0.8 — Real Use & Feedback',
     status: 'active',
     items: [
-      'Profil-Widget + Logout (← gerade gebaut)',
+      'Profil-Widget + Logout',
+      'Einladungslinks (einmalig, direkt approved)',
       'Auto-Update (electron-updater, wie Discord)',
       'sprecher: System-Prompt pro Session, Export',
       'sprecher: Grok-Vision (Bild-Verständnis)',

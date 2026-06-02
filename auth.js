@@ -71,6 +71,21 @@ export function setupAuth(app, { odb, dbName }) {
       method: 'POST', body: command, headers: { 'Content-Type': 'text/plain' },
     });
 
+  async function ensureInviteSchema() {
+    for (const s of [
+      'CREATE CLASS InviteToken IF NOT EXISTS',
+      'CREATE PROPERTY InviteToken.token      IF NOT EXISTS STRING',
+      'CREATE PROPERTY InviteToken.role       IF NOT EXISTS STRING',
+      'CREATE PROPERTY InviteToken.note       IF NOT EXISTS STRING',
+      'CREATE PROPERTY InviteToken.createdBy  IF NOT EXISTS STRING',
+      'CREATE PROPERTY InviteToken.createdAt  IF NOT EXISTS DATETIME',
+      'CREATE PROPERTY InviteToken.usedAt     IF NOT EXISTS DATETIME',
+      'CREATE PROPERTY InviteToken.usedBy     IF NOT EXISTS STRING',
+      'CREATE PROPERTY InviteToken.expiresAt  IF NOT EXISTS DATETIME',
+      'CREATE INDEX InviteToken.token IF NOT EXISTS UNIQUE',
+    ]) await sql(s);
+  }
+
   async function ensurePersonSchema() {
     const stmts = [
       'CREATE CLASS Person IF NOT EXISTS EXTENDS V',
@@ -195,6 +210,7 @@ export function setupAuth(app, { odb, dbName }) {
         if (!code || !state || !saved || saved.state !== state) {
           return res.status(400).send('OAuth-State ungültig. <a href="/auth/login">nochmal</a>');
         }
+        const inviteToken = saved.invite || null;
         // Code -> Token
         const tokRes = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
@@ -217,10 +233,28 @@ export function setupAuth(app, { odb, dbName }) {
         if (!profile.email || profile.email_verified === false) {
           throw new Error('Keine verifizierte E-Mail von Google');
         }
-        // Person persistieren — best-effort: schlägt die DB fehl, kommt der
-        // Admin trotzdem rein (Freunde brauchen die DB für den pending-State).
-        try { await upsertOnLogin(profile); }
-        catch (e) { console.error(`  ! Person-Upsert (OrientDB erreichbar?): ${e.message}`); }
+        // Person persistieren — best-effort
+        try {
+          await upsertOnLogin(profile);
+          // Invite-Token einlösen → Person direkt auf approved setzen
+          if (inviteToken) {
+            const now = new Date().toISOString().replace('T',' ').slice(0,19);
+            const ir = await sql(`SELECT @rid, role, usedAt, expiresAt FROM InviteToken WHERE token = ${sqlStr(inviteToken)} LIMIT 1`);
+            const inv = ir.result?.[0];
+            if (inv && !inv.usedAt) {
+              const expired = inv.expiresAt && new Date(inv.expiresAt) < new Date();
+              if (!expired) {
+                // Token als verwendet markieren
+                const trid = String(inv['@rid']).replace(/[^0-9:#]/g,'');
+                await sql(`UPDATE ${trid} SET usedAt=${sqlStr(now)}, usedBy=${sqlStr(profile.email.toLowerCase())}`);
+                // Person auf approved setzen + Rolle aus Invite übernehmen
+                const pres = await sql(`SELECT @rid FROM Person WHERE email = ${sqlStr(profile.email.toLowerCase())} LIMIT 1`);
+                const prid = String(pres.result?.[0]?.['@rid']||'').replace(/[^0-9:#]/g,'');
+                if (prid) await sql(`UPDATE ${prid} SET status='approved', role=${sqlStr(inv.role||'friend')}, decidedAt=${sqlStr(now)}`);
+              }
+            }
+          }
+        } catch (e) { console.error(`  ! Person-Upsert (OrientDB erreichbar?): ${e.message}`); }
         setCookie(res, COOKIE,
           sign({ email: profile.email.toLowerCase(), name: profile.name || '' }, SESSION_SECRET),
           { maxAge: SESSION_MAX_AGE, secure });
@@ -251,5 +285,63 @@ export function setupAuth(app, { odb, dbName }) {
     res.json(await decidePerson(`#${req.params.rid}`, 'reject'));
   }));
 
-  return { enabled, ensurePersonSchema, requireAuth, requireAdmin, currentUser };
+  // ── Invite-Links ─────────────────────────────────────────────────────
+  // POST /api/invites → { token, url }   (Admin-only)
+  // GET  /api/invites → liste alle       (Admin-only)
+  // GET  /auth/invite?t=TOKEN → nach Login auto-approved
+
+  app.post('/api/invites', requireAdmin(), async (req, res) => {
+    try {
+      const token = crypto.randomBytes(20).toString('base64url');
+      const now   = new Date();
+      const exp   = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 Tage
+      const fmt   = (d) => d.toISOString().replace('T',' ').slice(0,19);
+      const role  = req.body?.role === 'admin' ? 'admin' : 'friend';
+      const note  = String(req.body?.note || '').slice(0,80);
+      const by    = req.user?.email || 'admin';
+      await sql(
+        `INSERT INTO InviteToken SET token=${sqlStr(token)}, role=${sqlStr(role)}, ` +
+        `note=${sqlStr(note)}, createdBy=${sqlStr(by)}, ` +
+        `createdAt=${sqlStr(fmt(now))}, expiresAt=${sqlStr(fmt(exp))}`
+      );
+      const base = OAUTH_REDIRECT_URI.replace('/auth/callback', '');
+      res.json({ token, url: `${base}/auth/invite?t=${token}`, role, expiresAt: fmt(exp) });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/invites', requireAdmin(), async (req, res) => {
+    try {
+      const r = await sql(`SELECT @rid, * FROM InviteToken ORDER BY createdAt DESC LIMIT 100`);
+      res.json({ invites: r.result || [] });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/invites/:token', requireAdmin(), async (req, res) => {
+    try {
+      await sql(`DELETE FROM InviteToken WHERE token = ${sqlStr(req.params.token)}`);
+      res.json({ ok: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Invite-Flow: speichert Token im State-Cookie, Google-Login danach
+  // liest ihn aus und approved den User direkt.
+  if (enabled) {
+    app.get('/auth/invite', (req, res) => {
+      const t = String(req.query.t || '').replace(/[^A-Za-z0-9_-]/g,'');
+      if (!t) return res.status(400).send('Ungültiger Einladungslink.');
+      const state = crypto.randomBytes(16).toString('hex');
+      // Token + state zusammen im State-Cookie
+      setCookie(res, STATE_COOKIE, sign({ state, invite: t }, SESSION_SECRET), { maxAge: 600, secure });
+      const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      url.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+      url.searchParams.set('redirect_uri', OAUTH_REDIRECT_URI);
+      url.searchParams.set('response_type', 'code');
+      url.searchParams.set('scope', 'openid email profile');
+      url.searchParams.set('state', state);
+      url.searchParams.set('prompt', 'select_account');
+      res.redirect(url.toString());
+    });
+  }
+
+  return { enabled, ensurePersonSchema, ensureInviteSchema, requireAuth, requireAdmin, currentUser };
 }
