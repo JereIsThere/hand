@@ -52,7 +52,10 @@
       "repo": "hand"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "nsis-web", "arch": ["x64"] }
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {

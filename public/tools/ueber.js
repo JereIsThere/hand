@@ -155,8 +155,37 @@ function renderRoadmap() {
 }
 
 // ── Update-Banner (Electron IPC) ──────────────────────────────────────
+async function initChannelToggle() {
+  if (!window.electronAPI?.getChannel) return;
+  const current = await window.electronAPI.getChannel();
+  let banner = document.getElementById('channel-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'channel-banner';
+    banner.style.cssText = 'position:fixed;top:12px;right:16px;z-index:4000;' +
+      'background:#0e0820;border:1px solid #2a1d44;border-radius:10px;' +
+      'padding:8px 12px;font-size:12px;color:#9a8fb5;display:flex;align-items:center;gap:10px;';
+    document.body.append(banner);
+  }
+  const isProd = current === 'latest';
+  banner.innerHTML = `
+    <span style="color:#6f6488;">Update-Kanal:</span>
+    <button id="ch-prod" style="padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${isProd ? '#00d4c8' : '#2a1d44'};background:${isProd ? '#0a2a2a' : 'none'};color:${isProd ? '#00d4c8' : '#6f6488'};">🟢 prod</button>
+    <button id="ch-dev"  style="padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${!isProd ? '#d4a200' : '#2a1d44'};background:${!isProd ? '#2a1a00' : 'none'};color:${!isProd ? '#d4a200' : '#6f6488'};">🟡 dev</button>
+  `;
+  banner.querySelector('#ch-prod').onclick = async () => {
+    window.electronAPI.setChannel('latest');
+    await initChannelToggle();
+  };
+  banner.querySelector('#ch-dev').onclick = async () => {
+    window.electronAPI.setChannel('beta');
+    await initChannelToggle();
+  };
+}
+
 function initUpdateListener() {
   if (!window.electronAPI) return; // nur in Electron
+  initChannelToggle();
   window.electronAPI.onUpdateStatus((ev, info) => {
     let banner = document.getElementById('update-banner');
     if (!banner) {
