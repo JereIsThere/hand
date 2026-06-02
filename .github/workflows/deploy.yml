@@ -24,13 +24,10 @@ jobs:
           script: |
             set -e
             export PATH="$PATH:/usr/local/bin:/usr/bin"
-            # nvm falls vorhanden
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             cd /var/lib/deploy/hand
             git fetch --all --quiet
             git reset --hard origin/main
-            npm ci --omit=dev
+            pnpm install --prod --frozen-lockfile
             sudo systemctl restart hand
             systemctl is-active hand
             echo "deployed: $(git rev-parse --short HEAD)"
