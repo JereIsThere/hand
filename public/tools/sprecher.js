@@ -203,7 +203,6 @@ function renderShell() {
 <input type="file" id="sp-file-input" accept="image/*" style="display:none;" multiple>
 `;
 }
-}
 
 // ── Sessions-Sidebar ──────────────────────────────────────────────────
 function renderSessionList() {
