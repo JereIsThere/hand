@@ -5,12 +5,21 @@
 
 export const SETUP_KEYS = [
   {
-    key: 'GEHIRN_URL',
-    label: 'gehirn API-URL',
-    service: 'gehirn',
-    description: 'Basis-URL des gehirn-Dienstes (KI-Text/Bild/Video für sprecher).',
-    placeholder: 'http://localhost:4000',
-    secret: false,
+    key: 'ANTHROPIC_API_KEY',
+    label: 'Anthropic API Key',
+    service: 'anthropic',
+    description: 'Für Claude (Text + Vision) in sprecher. console.anthropic.com.',
+    placeholder: 'sk-ant-api03-…',
+    secret: true,
+    group: 'KI',
+  },
+  {
+    key: 'GROK_API_KEY',
+    label: 'Grok / xAI API Key',
+    service: 'xai',
+    description: 'Für Grok (Text) + Grok-Image (Bildgenerierung) in sprecher. console.x.ai.',
+    placeholder: 'xai-…',
+    secret: true,
     group: 'KI',
   },
   {
