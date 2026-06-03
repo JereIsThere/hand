@@ -30,6 +30,10 @@
         <span class="sb-icon">📥</span>
         <span class="sb-label">Submissions</span>
       </button>
+      <button class="sb-item" data-tool="reder">
+        <span class="sb-icon">💬</span>
+        <span class="sb-label">Reder</span>
+      </button>
       <div class="sb-sep"></div>
       <button class="sb-item" data-tool="projects">
         <span class="sb-icon">📋</span>
@@ -211,6 +215,55 @@
             <tbody></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TOOL · Reder (KI-Chat)
+         ========================================================= -->
+    <section class="tool" id="tool-reder">
+      <header class="topbar">
+        <div class="brand"><h1>Reder</h1></div>
+        <div class="status"></div>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="chat">Chat</button>
+        <button class="tab" data-tab="vault">Vault</button>
+      </nav>
+
+      <div class="tool-body reder-body">
+
+        <!-- Chat panel -->
+        <section class="panel active" id="reder-panel-chat">
+          <div class="reder-controls">
+            <label>Provider
+              <select id="reder-provider-sel"></select>
+            </label>
+            <label>Modell
+              <select id="reder-model-sel"></select>
+            </label>
+            <button class="btn ghost" id="reder-clear" title="Unterhaltung leeren">↺ neu</button>
+          </div>
+          <div id="reder-chat-list" class="reder-chat-list"></div>
+          <div id="reder-media-preview" class="reder-media-preview"></div>
+          <div class="reder-input-row">
+            <button class="btn ghost" id="reder-attach" title="Bild oder Video anfügen">+</button>
+            <input type="file" id="reder-file-input" accept="image/*,video/*" multiple hidden />
+            <textarea id="reder-input" rows="3" placeholder="Nachricht … (Ctrl+Enter senden, Bilder einfügen mit Paste)"></textarea>
+            <button class="btn" id="reder-send">senden</button>
+          </div>
+        </section>
+
+        <!-- Vault panel -->
+        <section class="panel" id="reder-panel-vault">
+          <div class="panel-head">
+            <h2>API-Keys</h2>
+            <p class="muted small">Keys werden lokal in vault.json gespeichert und nie übertragen.</p>
+          </div>
+          <div id="reder-vault-list" class="reder-vault-list"></div>
+        </section>
+
       </div>
     </section>
 
@@ -413,6 +466,31 @@
       </footer>
     </div>
     <div class="wizard-backdrop" id="subs-modal-backdrop"></div>
+  </div>
+
+  <!-- Reder · Key-Modal -->
+  <div class="wizard" id="reder-key-modal" aria-hidden="true">
+    <div class="wizard-shell" style="width: min(480px, 100%);">
+      <header class="wizard-head">
+        <div>
+          <small class="muted">Vault</small>
+          <h3 id="reder-key-modal-title">API-Key</h3>
+        </div>
+        <button class="btn ghost" id="reder-key-cancel">✕</button>
+      </header>
+      <div class="wizard-body">
+        <div class="field">
+          <label><span>Key</span></label>
+          <input id="reder-key-input" type="password" placeholder="sk-… / AIza… / anthropic-…" autocomplete="off" />
+        </div>
+      </div>
+      <footer class="wizard-foot">
+        <button class="btn ghost" id="reder-key-cancel-foot">abbrechen</button>
+        <span class="spacer"></span>
+        <button class="btn" id="reder-key-save">speichern</button>
+      </footer>
+    </div>
+    <div class="wizard-backdrop" id="reder-key-modal-backdrop"></div>
   </div>
 
   <div id="toasts" class="toasts"></div>

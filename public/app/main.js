@@ -8,11 +8,12 @@ import { initWizard, openWizard } from '../features/class-wizard.js';
 import { initTunnels, activateTunnels, deactivateTunnels } from '../tools/tunnels.js';
 import { initSubmissions, activateSubmissions, deactivateSubmissions } from '../tools/submissions.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
+import { initReder } from '../tools/reder.js';
 
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
 // ----------------------------------------------------------------
-const TOOLS = ['orientdb', 'tunnels', 'submissions', 'projects', 'funkner'];
+const TOOLS = ['orientdb', 'tunnels', 'submissions', 'reder', 'projects', 'funkner'];
 
 function switchTool(name) {
   if (!TOOLS.includes(name)) name = 'orientdb';
@@ -112,6 +113,9 @@ async function bootstrap() {
 
   // Submissions-internal listeners
   initSubmissions();
+
+  // Reder (KI-Chat)
+  initReder();
 
   // External embed tools
   initEmbeds();

@@ -8,7 +8,7 @@ import 'dotenv/config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(express.json({ limit: '4mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.text({ limit: '4mb', type: ['text/plain', 'application/sql'] }));
 
 const {
@@ -520,6 +520,179 @@ app.post('/api/tunnels/:id/stop', wrap(async (req) => {
 app.get('/api/tunnels/:id/log', wrap(async (req) => {
   return { log: tunnels.get(safeId(req.params.id)).log };
 }));
+
+// ============================================================
+// Vault — API-Keys (vault.json, niemals committen)
+// ============================================================
+const VAULT_FILE = path.join(__dirname, 'vault.json');
+const VAULT_PROVIDERS = ['anthropic', 'openai', 'gemini'];
+
+function loadVault() {
+  if (!fs.existsSync(VAULT_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(VAULT_FILE, 'utf8')); } catch { return {}; }
+}
+
+function saveVault(v) {
+  fs.writeFileSync(VAULT_FILE, JSON.stringify(v, null, 2));
+}
+
+app.get('/api/vault', wrap(async () =>
+  VAULT_PROVIDERS.map(p => ({ provider: p, set: !!loadVault()[p] }))
+));
+
+app.post('/api/vault', wrap(async (req) => {
+  const { provider, key } = req.body || {};
+  if (!VAULT_PROVIDERS.includes(provider))
+    throw Object.assign(new Error(`Unbekannter Provider: ${provider}`), { status: 400 });
+  if (!key || typeof key !== 'string' || !key.trim())
+    throw Object.assign(new Error('key darf nicht leer sein'), { status: 400 });
+  const v = loadVault();
+  v[provider] = key.trim();
+  saveVault(v);
+  return { provider, set: true };
+}));
+
+app.delete('/api/vault/:provider', wrap(async (req) => {
+  const provider = req.params.provider;
+  if (!VAULT_PROVIDERS.includes(provider))
+    throw Object.assign(new Error(`Unbekannter Provider: ${provider}`), { status: 400 });
+  const v = loadVault();
+  delete v[provider];
+  saveVault(v);
+  return { provider, set: false };
+}));
+
+// ============================================================
+// Reder — KI-Chat Proxy (streaming SSE)
+// ============================================================
+
+function toAnthropicMessages(messages) {
+  return messages.map(m => ({
+    role: m.role,
+    content: m.content.map(c => {
+      if (c.type === 'text')  return { type: 'text', text: c.text };
+      if (c.type === 'image') return { type: 'image', source: { type: 'base64', media_type: c.mimeType, data: c.data } };
+      return { type: 'text', text: '[nicht unterstützter Medientyp]' };
+    }),
+  }));
+}
+
+function toOpenAIMessages(messages) {
+  return messages.map(m => ({
+    role: m.role,
+    content: m.content.map(c => {
+      if (c.type === 'text')  return { type: 'text', text: c.text };
+      if (c.type === 'image') return { type: 'image_url', image_url: { url: `data:${c.mimeType};base64,${c.data}` } };
+      return { type: 'text', text: '[nicht unterstützter Medientyp]' };
+    }),
+  }));
+}
+
+function toGeminiContents(messages) {
+  return messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: m.content.map(c => {
+      if (c.type === 'text') return { text: c.text };
+      if (c.type === 'image' || c.type === 'video') return { inlineData: { mimeType: c.mimeType, data: c.data } };
+      return { text: '[nicht unterstützter Medientyp]' };
+    }),
+  }));
+}
+
+async function streamSSE(res, asyncFn) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+  try {
+    await asyncFn(send);
+    send({ done: true });
+  } catch (e) {
+    send({ error: e.message });
+  }
+  res.end();
+}
+
+async function readSSEStream(r, onDelta) {
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const raw = line.slice(6).trim();
+      if (raw === '[DONE]') continue;
+      try { onDelta(JSON.parse(raw)); } catch {}
+    }
+  }
+}
+
+app.post('/api/reder/chat', async (req, res) => {
+  const { provider, model, messages } = req.body || {};
+  if (!VAULT_PROVIDERS.includes(provider))
+    return res.status(400).json({ error: `Unbekannter Provider: ${provider}` });
+  const key = loadVault()[provider];
+  if (!key) return res.status(401).json({ error: `Kein API-Key für ${provider} im Vault` });
+
+  await streamSSE(res, async (send) => {
+    if (provider === 'anthropic') {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: model || 'claude-sonnet-4-6', max_tokens: 8096, stream: true, messages: toAnthropicMessages(messages) }),
+      });
+      if (!r.ok) { send({ error: `Anthropic ${r.status}: ${(await r.text()).slice(0, 300)}` }); return; }
+      await readSSEStream(r, (evt) => {
+        if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') send({ delta: evt.delta.text });
+      });
+
+    } else if (provider === 'openai') {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: model || 'gpt-4o', stream: true, messages: toOpenAIMessages(messages) }),
+      });
+      if (!r.ok) { send({ error: `OpenAI ${r.status}: ${(await r.text()).slice(0, 300)}` }); return; }
+      await readSSEStream(r, (evt) => {
+        const delta = evt.choices?.[0]?.delta?.content;
+        if (delta) send({ delta });
+      });
+
+    } else if (provider === 'gemini') {
+      const modelId = model || 'gemini-2.0-flash';
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?key=${key}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: toGeminiContents(messages) }) },
+      );
+      if (!r.ok) { send({ error: `Gemini ${r.status}: ${(await r.text()).slice(0, 300)}` }); return; }
+      // Gemini streams as a JSON array; each chunk is a complete object on its own line
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          const trimmed = line.replace(/^,/, '').trim();
+          if (!trimmed || trimmed === '[' || trimmed === ']') continue;
+          try {
+            const evt = JSON.parse(trimmed);
+            const text = evt.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) send({ delta: text });
+          } catch {}
+        }
+      }
+    }
+  });
+});
 
 // ============================================================
 // static + lifecycle
