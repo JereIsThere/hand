@@ -45,9 +45,8 @@ function renderRow(row) {
       class: 'btn',
       onclick: async () => {
         try {
-          const r = await subsApi.approve(rid);
-          const b = r.build || {};
-          toast(b.triggered ? 'genehmigt · n8n-Build getriggert' : `genehmigt · Build nicht getriggert (${b.reason || b.status || '—'})`, b.triggered ? 'ok' : '');
+          await subsApi.approve(rid);
+          toast('genehmigt', 'ok');
           refresh();
         } catch (e) { toast(e.message, 'fail'); }
       },

@@ -16,7 +16,7 @@ const ROADMAP = [
     items: [
       'OrientDB-Admin (Schema, Records, Query)',
       'SSH-Tunnel-Manager',
-      'Auge-Submissions + n8n-Build-Workflow',
+      'Auge-Submissions (Approval-Flow)',
       'Google-OAuth + Approval-Flow (Freundeskreis)',
       'Vault (AES-256-GCM, GUI + CLI)',
       'AI Shell (Haiku-Analyse, ShellLog)',
@@ -46,7 +46,7 @@ const ROADMAP = [
     status: 'planned',
     items: [
       'Command Palette (Ctrl+K, durchsuchbare Aktionen, Links, Webhooks)',
-      'Auge: Mini-Artikel-Generator (Submission → n8n → echter Lektion-Entwurf)',
+      'Auge: Mini-Artikel-Generator (Submission → gehirn → echter Lektion-Entwurf)',
       'sprecher: Video-Kommando (/video → Veo)',
       'arm/hand-Split (Admin-Vollversion vs. casual Freundes-App)',
       'hand: User-Submissions (casual: Themen vorschlagen)',

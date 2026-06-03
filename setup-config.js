@@ -5,13 +5,13 @@
 
 export const SETUP_KEYS = [
   {
-    key: 'N8N_BUILD_WEBHOOK',
-    label: 'n8n Build-Webhook',
-    service: 'n8n',
-    description: 'URL des n8n-Workflows der bei genehmigten Auge-Submissions ein Themen-Skelett baut.',
-    placeholder: 'https://n8n.jeremias-groehl.de/webhook/auge-submission-build',
+    key: 'GEHIRN_URL',
+    label: 'gehirn API-URL',
+    service: 'gehirn',
+    description: 'Basis-URL des gehirn-Dienstes (KI-Text/Bild/Video für sprecher).',
+    placeholder: 'http://localhost:4000',
     secret: false,
-    group: 'Auge',
+    group: 'KI',
   },
   {
     key: 'GOOGLE_CLIENT_ID',

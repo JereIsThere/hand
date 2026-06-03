@@ -28,7 +28,6 @@ const {
   ORIENTDB_PASS = '',
   ORIENTDB_DB = 'mydb',
   PORT = 3737,
-  N8N_BUILD_WEBHOOK = '',
   SSH_HOST = '',
   SSH_USER = '',
   SSH_PORT = '22',
@@ -179,11 +178,11 @@ app.post('/api/query', wrap(async (req) => {
 }));
 
 // ============================================================
-// Auge-Submissions  (User schlägt Thema vor → Admin genehmigt → n8n baut)
+// Auge-Submissions  (User schlägt Thema vor → Admin genehmigt → Build)
 //
 // Datenmodell: Vertex-Klasse `Submission` in derselben OrientDB.
-// Flow:  pending → approved (n8n-Build getriggert) → built   |   rejected
-// Siehe auge-framework/docs/adr/0001-auge-hand-kopplung.md
+// Flow:  pending → approved → built   |   rejected
+// (Theme-Skelett-Build läuft künftig über gehirn, nicht mehr n8n.)
 // ============================================================
 const SUBMISSION_STATI = ['pending', 'approved', 'rejected', 'built'];
 
@@ -218,22 +217,6 @@ async function putDoc(rid, doc) {
   return await odb(`/document/${ORIENTDB_DB}/${safeRid(rid)}`, {
     method: 'PUT', body: JSON.stringify(doc),
   });
-}
-
-// n8n-Build-Workflow anstoßen. Best-effort: Fehler werden zurückgegeben,
-// aber die Genehmigung bleibt bestehen (manueller Retrigger möglich).
-async function triggerBuild(submission) {
-  if (!N8N_BUILD_WEBHOOK) return { triggered: false, reason: 'N8N_BUILD_WEBHOOK nicht gesetzt' };
-  try {
-    const res = await fetch(N8N_BUILD_WEBHOOK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: 'submission.approved', submission }),
-    });
-    return { triggered: res.ok, status: res.status };
-  } catch (e) {
-    return { triggered: false, reason: e.message };
-  }
 }
 
 app.get('/api/submissions', wrap(async (req) => {
@@ -275,8 +258,9 @@ app.post('/api/submissions/:rid/approve', wrap(async (req) => {
   doc.status = 'approved';
   doc.decidedAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
   const saved = await putDoc(req.params.rid, doc);
-  const build = await triggerBuild({ rid: doc['@rid'] || `#${safeRid(req.params.rid)}`, ...doc });
-  return { record: saved, build };
+  // Build-Trigger entfernt — der Theme-Skelett-Build läuft künftig über gehirn,
+  // nicht mehr über n8n. Approve setzt vorerst nur den Status.
+  return { record: saved };
 }));
 
 app.post('/api/submissions/:rid/reject', wrap(async (req) => {
@@ -600,7 +584,6 @@ export async function startServer() {
     const server = app.listen(PORT, () => {
       console.log(`  Die Hand  -> http://localhost:${PORT}`);
       console.log(`        OrientDB-Proxy -> ${ORIENTDB_URL}  (db: ${ORIENTDB_DB})`);
-      console.log(`        n8n-Build-Webhook: ${N8N_BUILD_WEBHOOK ? 'gesetzt' : '— nicht gesetzt —'}`);
       console.log(`        Auth: ${authz.enabled ? 'Google-OAuth aktiv (Approval-Flow)' : '— aus (lokal-offen) —'}`);
       console.log(`        Daten-Dir: ${DATA_DIR}`);
       console.log(`        Tunnels: ${tunnels.list().length} konfiguriert\n`);

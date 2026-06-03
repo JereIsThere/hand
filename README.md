@@ -6,7 +6,7 @@ Aktuelle Tools:
 
 - **OrientDB** — Schema-Browser, Records-Tabelle, Editor (typisiert + Raw-JSON), Klassen-Wizard, SQL/Gremlin-Konsole. (war früher als eigenständiges `orientdb-admin` unterwegs, wurde in `hand` reingezogen)
 - **SSH-Tunnel** — Tunnel-Manager. Der für OrientDB ist aus `.env` als „managed" vorkonfiguriert (auto-startet beim Server-Boot). Weitere Tunnel kommen über die UI dazu (persistiert in `tunnels.json`).
-- **Auge-Submissions** — Themen-Vorschläge für [auge](https://github.com/JereIsThere/auge). Vorschläge landen als `Submission`-Vertices in derselben OrientDB. Admin sieht die offenen, **genehmigt** (→ stößt einen n8n-Build-Workflow an, `N8N_BUILD_WEBHOOK`) oder **lehnt ab**. Flow: `pending → approved → built` | `rejected`. Das `Submission`-Schema wird beim Server-Boot idempotent angelegt. Siehe [auge-framework ADR-0001](https://github.com/JereIsThere/auge-framework/blob/main/docs/adr/0001-auge-hand-kopplung.md).
+- **Auge-Submissions** — Themen-Vorschläge für [auge](https://github.com/JereIsThere/auge). Vorschläge landen als `Submission`-Vertices in derselben OrientDB. Admin sieht die offenen, **genehmigt** oder **lehnt ab** (der Theme-Skelett-Build läuft künftig über gehirn). Flow: `pending → approved → built` | `rejected`. Das `Submission`-Schema wird beim Server-Boot idempotent angelegt. Siehe [auge-framework ADR-0001](https://github.com/JereIsThere/auge-framework/blob/main/docs/adr/0001-auge-hand-kopplung.md).
 - **Projects / Funkner** — externe Seiten (`projects.jeremias-groehl.de`, `funkner.jeremias-groehl.de`) eingebettet per iframe, lazy beim ersten Öffnen. Falls die Seite das Einbetten verweigert (X-Frame-Options/CSP), erscheint ein „neuer Tab"-Fallback.
 
 Daneben gibt es **Zettel** (`scripts/zettel/`) — eine eigenständige Windows-Sticky-Note (always-on-top, resizable, WPF via PowerShell), die *nicht* Teil der Web-Shell ist, sondern als nativer Desktop-Begleiter danebenliegt. Siehe `scripts/zettel/README.md`.
@@ -124,7 +124,7 @@ Weitere Tunnel anlegen: SSH-Tunnel-Tab → `+ Tunnel` → Felder ausfüllen → 
 |---------|-----------------------------------|------------------------------------------------------------|
 | GET     | `/api/submissions?status=`        | Vorschläge listen (Filter: pending/approved/rejected/built) |
 | POST    | `/api/submissions`                | Neuer Vorschlag `{ slug, titel, kategorie?, beschreibung?, vorgeschlagenVon? }` → status `pending` |
-| POST    | `/api/submissions/:rid/approve`   | genehmigen → status `approved`, triggert `N8N_BUILD_WEBHOOK` |
+| POST    | `/api/submissions/:rid/approve`   | genehmigen → status `approved` |
 | POST    | `/api/submissions/:rid/reject`    | ablehnen `{ grund? }` → status `rejected`                  |
 
 ## Struktur
@@ -134,7 +134,7 @@ hand/
 ├── server.js
 │   ├── OrientDB-Proxy (Basic-Auth aus .env)
 │   ├── TunnelManager (managed via .env + unmanaged via tunnels.json)
-│   └── Submissions (Submission-Schema-Ensure + approve→n8n-Webhook)
+│   └── Submissions (Submission-Schema-Ensure + approve)
 ├── Dockerfile          — Container für das auge-framework-compose
 ├── scripts/
 │   ├── start.cmd        — Windows-Launcher
@@ -169,5 +169,6 @@ hand/
 
 Mittelfristig wird *Die Hand* der Träger für mehr als nur Admin-Tooling:
 
-- **Auge-Submissions:** Eine User-Variante (read-only Shell) lässt Leute Themen-Requests für [auge](https://github.com/JereIsThere/auge) submitten. *Die Hand* (also dieses Repo, die Admin-Seite) genehmigt; in n8n laufen dann die Build-Workflows.
-- Weitere Tools (Postgres, n8n-Trigger, Log-Viewer, …) kommen als zusätzliche Sidebar-Items.
+- **Auge-Submissions:** Eine User-Variante (read-only Shell) lässt Leute Themen-Requests für [auge](https://github.com/JereIsThere/auge) submitten. *Die Hand* (also dieses Repo, die Admin-Seite) genehmigt; der Build (Theme-Skelett → PR) läuft künftig über **gehirn**.
+- **KI über gehirn:** Text/Bild/Video (sprecher) gehen über den gehirn-Dienst (Express). n8n bleibt nur für wirklich simple KI-Workflows.
+- Weitere Tools (Postgres, Log-Viewer, …) kommen als zusätzliche Sidebar-Items.
