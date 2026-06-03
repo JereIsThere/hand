@@ -1,11 +1,27 @@
 // sprecher — Chat-Backend für Die Hand.
-// Sessions + Messages in OrientDB. Chat-Proxy via SSE-Streaming.
-// Migriert zu gehirn als API Provider.
+// Sessions + Messages in OrientDB. KI-Calls DIREKT in hand (Anthropic + xAI),
+// Keys aus Vault/.env. (gehirn-Proxy kommt später wieder — Tools bringen ihre
+// API dann selbst mit.)
 
 const sqlStr = (s) => `'${String(s == null ? '' : s).replace(/'/g, "''").slice(0, 8000)}'`;
 const safeId = (s) => String(s).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
 
-const GEHIRN_URL = process.env.GEHIRN_URL || 'http://localhost:4000';
+// ── Modell-Katalog ─────────────────────────────────────────────────────
+// provider: 'anthropic' | 'xai'.  group: text | image | video.
+const CATALOG = [
+  { id: 'claude-sonnet-4-6', family: 'claude', label: 'Claude Sonnet 4.6', provider: 'anthropic', group: 'text' },
+  { id: 'claude-opus-4-8',   family: 'claude', label: 'Claude Opus 4.8',   provider: 'anthropic', group: 'text' },
+  { id: 'claude-haiku-4-5',  family: 'claude', label: 'Claude Haiku 4.5',  provider: 'anthropic', group: 'text' },
+  { id: 'grok-3',            family: 'grok',   label: 'Grok 3',             provider: 'xai',       group: 'text' },
+  { id: 'grok-3-mini',       family: 'grok',   label: 'Grok 3 Mini',        provider: 'xai',       group: 'text' },
+  { id: 'grok-2-image',      family: 'grok',   label: 'Grok Image',         provider: 'xai',       group: 'image' },
+];
+
+const keyFor = (provider) => provider === 'anthropic'
+  ? process.env.ANTHROPIC_API_KEY
+  : (process.env.GROK_API_KEY || process.env.XAI_API_KEY);
+
+function modelById(id) { return CATALOG.find((m) => m.id === id); }
 
 export function setupSprecher(app, { odb, dbName, requireAuth }) {
   const sql = (cmd) => odb(`/command/${dbName}/sql`, {
@@ -40,67 +56,137 @@ export function setupSprecher(app, { odb, dbName, requireAuth }) {
     const r = await sql(`SELECT @rid, sid, title, model, updatedAt FROM SprecherSession ORDER BY updatedAt DESC LIMIT 200`);
     return r.result || [];
   }
-
   async function getSession(sid) {
     const r = await sql(`SELECT @rid, * FROM SprecherSession WHERE sid = ${sqlStr(sid)} LIMIT 1`);
     return r.result?.[0] || null;
   }
-
   async function upsertSession({ sid, title, model, systemPrompt }) {
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
     const existing = await getSession(sid);
     if (existing) {
       const rid = String(existing['@rid']).replace(/[^0-9:#]/g, '');
-      await sql(`UPDATE ${rid} SET title=${sqlStr(title||'')}, model=${sqlStr(model||'')}, updatedAt=${sqlStr(now)}`);
+      await sql(`UPDATE ${rid} SET title=${sqlStr(title || '')}, model=${sqlStr(model || '')}, updatedAt=${sqlStr(now)}`);
     } else {
-      await sql(`INSERT INTO SprecherSession SET sid=${sqlStr(sid)}, title=${sqlStr(title||'Neues Gespräch')}, model=${sqlStr(model||'')}, systemPrompt=${sqlStr(systemPrompt||'')}, createdAt=${sqlStr(now)}, updatedAt=${sqlStr(now)}`);
+      await sql(`INSERT INTO SprecherSession SET sid=${sqlStr(sid)}, title=${sqlStr(title || 'Neues Gespräch')}, model=${sqlStr(model || '')}, systemPrompt=${sqlStr(systemPrompt || '')}, createdAt=${sqlStr(now)}, updatedAt=${sqlStr(now)}`);
     }
   }
-
   async function deleteSession(sid) {
     await sql(`DELETE VERTEX SprecherSession WHERE sid = ${sqlStr(sid)}`);
     await sql(`DELETE FROM SprecherMessage WHERE sid = ${sqlStr(sid)}`);
   }
-
   async function getMessages(sid) {
     const r = await sql(`SELECT @rid, * FROM SprecherMessage WHERE sid = ${sqlStr(sid)} ORDER BY ts ASC LIMIT 2000`);
     return r.result || [];
   }
-
   async function appendMessage({ sid, role, content, type, model, imageUrl }) {
     const ts = new Date().toISOString().replace('T', ' ').slice(0, 23);
-    await sql(`INSERT INTO SprecherMessage SET sid=${sqlStr(sid)}, role=${sqlStr(role)}, content=${sqlStr(content||'')}, type=${sqlStr(type||'text')}, model=${sqlStr(model||'')}, imageUrl=${sqlStr(imageUrl||'')}, ts=${sqlStr(ts)}`);
-    // updatedAt der Session aktualisieren
-    await sql(`UPDATE SprecherSession SET updatedAt=${sqlStr(ts.slice(0,19))} WHERE sid=${sqlStr(sid)}`);
+    await sql(`INSERT INTO SprecherMessage SET sid=${sqlStr(sid)}, role=${sqlStr(role)}, content=${sqlStr(content || '')}, type=${sqlStr(type || 'text')}, model=${sqlStr(model || '')}, imageUrl=${sqlStr(imageUrl || '')}, ts=${sqlStr(ts)}`);
+    await sql(`UPDATE SprecherSession SET updatedAt=${sqlStr(ts.slice(0, 19))} WHERE sid=${sqlStr(sid)}`);
   }
 
-  // ── HTTP-Routen ───────────────────────────────────────────────────────
+  // ── Normalisierung der Messages für die jeweilige API ──────────────────
+  function toAnthropic(messages) {
+    return (messages || []).map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: Array.isArray(m.content) ? m.content : [{ type: 'text', text: String(m.content || '') }],
+    })).filter((m) => m.content.length);
+  }
+  function toOpenAiStyle(messages) {
+    // xAI = OpenAI-kompatibel; Bild-Parts (Vision) hier vereinfacht zu Text.
+    return (messages || []).map((m) => {
+      let content = m.content;
+      if (Array.isArray(content)) {
+        content = content.filter((p) => p.type === 'text').map((p) => p.text).join('\n');
+      }
+      return { role: m.role === 'assistant' ? 'assistant' : 'user', content: String(content || '') };
+    }).filter((m) => m.content);
+  }
+
+  // ── Text-Streaming: Anthropic ──────────────────────────────────────────
+  async function streamAnthropic({ model, messages, systemPrompt, res }) {
+    const key = keyFor('anthropic');
+    if (!key) throw new Error('ANTHROPIC_API_KEY fehlt (im Vault/Setup setzen)');
+    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 8192, stream: true, messages: toAnthropic(messages), ...(systemPrompt ? { system: systemPrompt } : {}) }),
+    });
+    if (!upstream.ok) throw new Error(`Anthropic ${upstream.status}: ${(await upstream.text()).slice(0, 200)}`);
+    return pipeSSE(upstream, res, (ev) => ev.delta?.text || '');
+  }
+
+  // ── Text-Streaming: xAI (OpenAI-Format) ────────────────────────────────
+  async function streamXai({ model, messages, systemPrompt, res }) {
+    const key = keyFor('xai');
+    if (!key) throw new Error('GROK_API_KEY fehlt (im Vault/Setup setzen)');
+    const msgs = [...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []), ...toOpenAiStyle(messages)];
+    const upstream = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, messages: msgs, stream: true, max_tokens: 8192 }),
+    });
+    if (!upstream.ok) throw new Error(`xAI ${upstream.status}: ${(await upstream.text()).slice(0, 200)}`);
+    return pipeSSE(upstream, res, (ev) => ev.choices?.[0]?.delta?.content || '');
+  }
+
+  // Liest Upstream-SSE, extrahiert Delta via picker, schreibt {delta} an Client.
+  async function pipeSSE(upstream, res, pick) {
+    const reader = upstream.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', full = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const raw = line.slice(5).trim();
+        if (!raw || raw === '[DONE]') continue;
+        try {
+          const delta = pick(JSON.parse(raw));
+          if (delta) { full += delta; res.write(`data: ${JSON.stringify({ delta })}\n\n`); }
+        } catch {}
+      }
+    }
+    return full;
+  }
+
+  // ── Bild-Generierung: xAI ──────────────────────────────────────────────
+  async function generateImage({ model, prompt }) {
+    const key = keyFor('xai');
+    if (!key) throw new Error('GROK_API_KEY fehlt (im Vault/Setup setzen)');
+    const upstream = await fetch('https://api.x.ai/v1/images/generations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: model || 'grok-2-image', prompt, n: 1 }),
+    });
+    if (!upstream.ok) throw new Error(`xAI image ${upstream.status}: ${(await upstream.text()).slice(0, 200)}`);
+    const data = await upstream.json();
+    return data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
+  }
+
+  // ── HTTP-Routen ─────────────────────────────────────────────────────────
   app.get('/api/sessions', requireAuth(), async (req, res) => {
     try { res.json({ sessions: await listSessions() }); }
     catch (e) { res.status(500).json({ error: e.message }); }
   });
-
   app.get('/api/sessions/:sid', requireAuth(), async (req, res) => {
     try {
       const s = await getSession(safeId(req.params.sid));
       if (!s) return res.status(404).json({ error: 'nicht gefunden' });
-      const messages = await getMessages(s.sid);
-      res.json({ session: s, messages });
+      res.json({ session: s, messages: await getMessages(s.sid) });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
-
   app.put('/api/sessions/:sid', requireAuth(), async (req, res) => {
-    try {
-      await upsertSession({ sid: safeId(req.params.sid), ...req.body });
-      res.json({ ok: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    try { await upsertSession({ sid: safeId(req.params.sid), ...req.body }); res.json({ ok: true }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
   });
-
   app.delete('/api/sessions/:sid', requireAuth(), async (req, res) => {
     try { await deleteSession(safeId(req.params.sid)); res.json({ ok: true }); }
     catch (e) { res.status(500).json({ error: e.message }); }
   });
-
   app.post('/api/sessions/:sid/messages', requireAuth(), async (req, res) => {
     try {
       const { role, content, type, model, imageUrl } = req.body || {};
@@ -109,121 +195,50 @@ export function setupSprecher(app, { odb, dbName, requireAuth }) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/models', requireAuth(), async (req, res) => {
-    try {
-      const gRes = await fetch(`${GEHIRN_URL}/models`);
-      if (!gRes.ok) throw new Error(`Gehirn models: ${gRes.status}`);
-      const data = await gRes.json();
-      res.json(data);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
+  // Modelle gruppiert (text/image/video), nur die mit vorhandenem Key.
+  app.get('/api/models', requireAuth(), (req, res) => {
+    const out = { text: [], image: [], video: [] };
+    for (const m of CATALOG) {
+      if (!keyFor(m.provider)) continue;
+      out[m.group].push({ id: m.id, family: m.family, label: m.label });
     }
+    res.json(out);
   });
 
-  app.get('/api/video-status/:id', requireAuth(), async (req, res) => {
-    try {
-      const gRes = await fetch(`${GEHIRN_URL}/gen/video/${req.params.id}`);
-      if (!gRes.ok) throw new Error(`Gehirn video status: ${gRes.status}`);
-      const data = await gRes.json();
-      res.json(data);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  // Streaming-Chat-Endpoint (proxied to gehirn)
+  // Chat: text (SSE), image (JSON), video (noch nicht — kommt mit gehirn).
   app.post('/api/chat', requireAuth(), async (req, res) => {
     const { sid, model, messages, systemPrompt, imagePrompt, mode, prompt } = req.body || {};
     if (!sid) return res.status(400).json({ error: 'sid erforderlich' });
 
-    // Handle Image Generation (Bild-Modus oder Legacy /image-Kommando)
     if (mode === 'image' || imagePrompt) {
       const activePrompt = imagePrompt || prompt || messages?.[messages.length - 1]?.content;
       if (!activePrompt) return res.status(400).json({ error: 'prompt erforderlich' });
       try {
-        const gRes = await fetch(`${GEHIRN_URL}/gen/image`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: activePrompt, model }),
-        });
-        if (!gRes.ok) {
-          const errData = await gRes.json().catch(() => ({}));
-          throw new Error(errData?.error || `Gehirn error: ${gRes.status}`);
-        }
-        const data = await gRes.json();
-        const imageUrl = data.urls?.[0] || '';
-        await appendMessage({ sid, role: 'assistant', content: activePrompt, type: 'image', model: data.model, imageUrl });
-        return res.json({ type: 'image', imageUrl, model: data.model });
-      } catch (e) {
-        return res.status(500).json({ error: e.message });
-      }
+        const imageUrl = await generateImage({ model, prompt: activePrompt });
+        await appendMessage({ sid, role: 'assistant', content: activePrompt, type: 'image', model, imageUrl });
+        return res.json({ type: 'image', imageUrl, model });
+      } catch (e) { return res.status(500).json({ error: e.message }); }
     }
 
-    // Handle Video Generation (Video-Modus)
     if (mode === 'video') {
-      const activePrompt = prompt || messages?.[messages.length - 1]?.content;
-      if (!activePrompt) return res.status(400).json({ error: 'prompt erforderlich' });
-      try {
-        const gRes = await fetch(`${GEHIRN_URL}/gen/video`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: activePrompt, model }),
-        });
-        if (!gRes.ok) {
-          const errData = await gRes.json().catch(() => ({}));
-          throw new Error(errData?.error || `Gehirn error: ${gRes.status}`);
-        }
-        const data = await gRes.json();
-        return res.json({ type: 'video', request_id: data.request_id, model: data.model });
-      } catch (e) {
-        return res.status(500).json({ error: e.message });
-      }
+      return res.status(501).json({ error: 'Video kommt später (braucht gehirn).' });
     }
 
-    // Default: Text Chat (SSE Streaming proxied to gehirn)
     if (!model) return res.status(400).json({ error: 'model erforderlich' });
+    const def = modelById(model);
+    if (!def) return res.status(400).json({ error: `Unbekanntes Modell: ${model}` });
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
+    res.flushHeaders?.();
 
     try {
-      const gRes = await fetch(`${GEHIRN_URL}/gen/text`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages, systemPrompt, stream: true }),
-      });
-      if (!gRes.ok) {
-        const errText = await gRes.text();
-        throw new Error(errText || `Gehirn error: ${gRes.status}`);
-      }
-
-      const reader = gRes.body.getReader();
-      const dec = new TextDecoder();
-      let full = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(value);
-
-        // Decode to extract text content for saving in OrientDB
-        const chunkText = dec.decode(value, { stream: true });
-        const lines = chunkText.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            const raw = line.slice(5).trim();
-            if (raw && raw !== '[DONE]') {
-              try {
-                const ev = JSON.parse(raw);
-                if (ev.delta) full += ev.delta;
-              } catch (e) {}
-            }
-          }
-        }
-      }
+      const full = def.provider === 'anthropic'
+        ? await streamAnthropic({ model, messages, systemPrompt, res })
+        : await streamXai({ model, messages, systemPrompt, res });
       await appendMessage({ sid, role: 'assistant', content: full, type: 'text', model });
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     } catch (e) {
       res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`);

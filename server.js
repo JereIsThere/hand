@@ -79,10 +79,15 @@ const wrap = (fn) => async (req, res) => {
 // /api-Endpoints (OrientDB, Tunnels, Submissions) Admin-only.
 // ============================================================
 const authz = setupAuth(app, { odb, dbName: ORIENTDB_DB });
+
+// sprecher ist FREUND-Level (requireAuth) — VOR dem Admin-Gate registrieren,
+// sonst würde das blanket requireAdmin unten die Routes abschatten.
+const sprecherModule  = setupSprecher(app,  { odb, dbName: ORIENTDB_DB, requireAuth: authz.requireAuth });
+
+// Ab hier: alle weiteren /api-Endpoints sind Admin-only.
 app.use('/api', authz.requireAdmin());
 const vaultModule   = setupVault(app,    { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
 const shellLogModule  = setupShellLog(app,  { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
-const sprecherModule  = setupSprecher(app,  { odb, dbName: ORIENTDB_DB, requireAuth: authz.requireAuth });
 
 // ── Setup-Status ────────────────────────────────────────────────────
 // Gibt zurück welche optionalen Keys gesetzt/fehlend sind (kein Klartext).
