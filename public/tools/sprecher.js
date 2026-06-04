@@ -7,6 +7,55 @@ import { $, el, toast } from '../shared/ui.js';
 const uid = () => 's_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const now = () => new Date().toISOString();
 
+// Inline confirm: erster Klick → "wirklich?" (2 s Timeout), zweiter Klick → action.
+function withConfirm(btn, action, labelDefault = '×', labelConfirm = '✓?') {
+  let timer = null;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (btn.dataset.confirming) {
+      clearTimeout(timer);
+      delete btn.dataset.confirming;
+      btn.textContent = labelDefault;
+      btn.style.color = '';
+      action();
+    } else {
+      btn.dataset.confirming = '1';
+      btn.textContent = labelConfirm;
+      btn.style.color = '#ff8080';
+      timer = setTimeout(() => {
+        delete btn.dataset.confirming;
+        btn.textContent = labelDefault;
+        btn.style.color = '';
+      }, 2000);
+    }
+  });
+}
+
+// Inline-Titelbearbeitung: macht sp-title editierbar, speichert bei Enter/blur.
+function startTitleEdit(titleEl, onSave) {
+  if (titleEl.dataset.editing) return;
+  titleEl.dataset.editing = '1';
+  const old = titleEl.textContent;
+  const inp = document.createElement('input');
+  inp.value = old;
+  inp.style.cssText = 'font-family:Georgia,serif;font-size:15px;font-weight:600;color:#e8e0f0;background:transparent;border:none;border-bottom:1px solid #00d4c8;outline:none;width:100%;min-width:60px;';
+  titleEl.textContent = '';
+  titleEl.append(inp);
+  inp.focus();
+  inp.select();
+  const commit = () => {
+    const v = inp.value.trim() || old;
+    delete titleEl.dataset.editing;
+    titleEl.textContent = v;
+    if (v !== old) onSave(v);
+  };
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { delete titleEl.dataset.editing; titleEl.textContent = old; }
+  });
+  inp.addEventListener('blur', commit);
+}
+
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -64,9 +113,11 @@ let currentMessages = [];
 let currentMode = 'text';
 let currentFamily = '';
 let currentModel = '';
+let currentSystemPrompt = '';
 let availableModels = { text: [], image: [], video: [] };
 let pendingAttachments = [];
 let streaming = false;
+let systemPanelOpen = false;
 let root = null;
 
 // ── API ───────────────────────────────────────────────────────────────
@@ -152,6 +203,14 @@ function renderShell() {
   .sp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#6f6488;text-align:center;gap:12px;}
   .sp-empty .icon{font-size:48px;}
   .sp-empty h2{font-family:Georgia,serif;font-size:20px;color:#9a8fb5;}
+  .sp-settings-btn{background:none;border:none;color:#6f6488;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;flex-shrink:0;}
+  .sp-settings-btn:hover{color:#00d4c8;background:#0e0820;}
+  .sp-settings-btn.active{color:#00d4c8;}
+  .sp-system-panel{padding:8px 16px;border-bottom:1px solid #1d1330;background:#080014;display:none;gap:8px;align-items:flex-start;}
+  .sp-system-panel.open{display:flex;}
+  .sp-system-panel textarea{flex:1;background:#0e0820;border:1px solid #2a1d44;border-radius:6px;color:#9a8fb5;font-size:12px;padding:6px 10px;resize:none;font-family:inherit;line-height:1.5;min-height:48px;max-height:120px;}
+  .sp-system-panel textarea:focus{outline:none;border-color:#00d4c8;color:#e8e0f0;}
+  .sp-system-panel label{font-size:11px;color:#6f6488;padding-top:8px;white-space:nowrap;flex-shrink:0;}
 </style>
 
 <div class="sp-sidebar">
@@ -164,25 +223,35 @@ function renderShell() {
 
 <div class="sp-main">
   <div class="sp-topbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <div class="sp-title" id="sp-title" title="Umbenennen">Neues Gespräch</div>
-    
-    <div class="sp-mode-selector" style="display:flex;background:#0d011c;border:1px solid #2a1d44;border-radius:20px;padding:2px;">
-      <label class="sp-mode-label active" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
-        <input type="radio" name="sp-mode" value="text" checked style="display:none;">
-        <span>📝 Text</span>
-      </label>
-      <label class="sp-mode-label" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
-        <input type="radio" name="sp-mode" value="image" style="display:none;">
-        <span>🖼️ Bild</span>
-      </label>
-      <label class="sp-mode-label" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
-        <input type="radio" name="sp-mode" value="video" style="display:none;">
-        <span>🎬 Video</span>
-      </label>
-    </div>
+    <div class="sp-title" id="sp-title" title="Umbenennen (Klick)">Neues Gespräch</div>
 
-    <select class="sp-model-sel" id="sp-family-sel" style="background:#0e0820;border:1px solid #2a1d44;color:#9a8fb5;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;"></select>
-    <select class="sp-model-sel" id="sp-model-sel" style="background:#0e0820;border:1px solid #2a1d44;color:#9a8fb5;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;"></select>
+    <div id="sp-model-controls" style="display:flex;align-items:center;gap:8px;">
+      <div class="sp-mode-selector" style="display:flex;background:#0d011c;border:1px solid #2a1d44;border-radius:20px;padding:2px;">
+        <label class="sp-mode-label active" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
+          <input type="radio" name="sp-mode" value="text" checked style="display:none;">
+          <span>📝 Text</span>
+        </label>
+        <label class="sp-mode-label" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
+          <input type="radio" name="sp-mode" value="image" style="display:none;">
+          <span>🖼️ Bild</span>
+        </label>
+        <label class="sp-mode-label" style="cursor:pointer;padding:4px 10px;border-radius:18px;font-size:11px;color:#9a8fb5;display:flex;align-items:center;gap:4px;user-select:none;margin:0;">
+          <input type="radio" name="sp-mode" value="video" style="display:none;">
+          <span>🎬 Video</span>
+        </label>
+      </div>
+      <select class="sp-model-sel" id="sp-family-sel"></select>
+      <select class="sp-model-sel" id="sp-model-sel"></select>
+      <button class="sp-settings-btn" id="sp-settings-btn" title="System-Prompt">⚙</button>
+    </div>
+    <div id="sp-no-keys" style="display:none;align-items:center;gap:8px;font-size:12px;color:#6f6488;">
+      <span>Keine API Keys konfiguriert —</span>
+      <button id="sp-open-setup" style="background:linear-gradient(90deg,#00d4c8,#d4a200);border:none;color:#06000e;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">Setup öffnen</button>
+    </div>
+  </div>
+  <div class="sp-system-panel" id="sp-system-panel">
+    <label>System</label>
+    <textarea id="sp-system-input" rows="2" placeholder="System-Prompt (optional) …"></textarea>
   </div>
   <div class="sp-messages" id="sp-messages">
     <div class="sp-empty">
@@ -213,57 +282,63 @@ function renderSessionList() {
     return;
   }
   for (const s of sessions) {
+    const delBtn = el('button', { class: 'sp-sess-del', title: 'löschen' }, '×');
+    withConfirm(delBtn, async () => {
+      await api.deleteSession(s.sid);
+      sessions = sessions.filter(x => x.sid !== s.sid);
+      if (currentSid === s.sid) { currentSid = null; currentMessages = []; renderMessages(); }
+      renderSessionList();
+    });
     const item = el('div', {
       class: 'sp-sess' + (s.sid === currentSid ? ' active' : ''),
       onclick: () => loadSession(s.sid),
     },
       el('span', { style: 'flex:1;overflow:hidden;text-overflow:ellipsis;' }, s.title || 'Neues Gespräch'),
-      el('button', {
-        class: 'sp-sess-del', title: 'löschen',
-        onclick: async (e) => {
-          e.stopPropagation();
-          if (!confirm(`Gespräch löschen?`)) return;
-          await api.deleteSession(s.sid);
-          sessions = sessions.filter(x => x.sid !== s.sid);
-          if (currentSid === s.sid) { currentSid = null; currentMessages = []; renderMessages(); }
-          renderSessionList();
-        },
-      }, '×'),
+      delBtn,
     );
     list.append(item);
   }
 }
 
 // ── Modell-Selector ───────────────────────────────────────────────────
+function hasAnyModels() {
+  return Object.values(availableModels).some(list => list.length > 0);
+}
+
 function updateDropdowns() {
+  const noModels = !hasAnyModels();
+  const controls = root.querySelector('#sp-model-controls');
+  const noKeysBanner = root.querySelector('#sp-no-keys');
+  if (controls) controls.style.display = noModels ? 'none' : 'flex';
+  if (noKeysBanner) noKeysBanner.style.display = noModels ? 'flex' : 'none';
+  if (noModels) return;
+
   const list = availableModels[currentMode] || [];
   const families = [...new Set(list.map(m => m.family))];
-  
+
   const familySel = root.querySelector('#sp-family-sel');
   familySel.innerHTML = '';
-  
+
   if (!families.includes(currentFamily)) {
     currentFamily = families[0] || '';
   }
-  
+
   for (const fam of families) {
     const opt = el('option', { value: fam, selected: fam === currentFamily }, fam.toUpperCase());
     familySel.append(opt);
   }
-  
+
   const modelSel = root.querySelector('#sp-model-sel');
   modelSel.innerHTML = '';
-  
+
   const familyModels = list.filter(m => m.family === currentFamily);
   if (familyModels.length > 0) {
     const modelExists = familyModels.some(m => m.id === currentModel);
-    if (!modelExists) {
-      currentModel = familyModels[0].id;
-    }
+    if (!modelExists) currentModel = familyModels[0].id;
   } else {
     currentModel = '';
   }
-  
+
   for (const m of familyModels) {
     const opt = el('option', { value: m.id, selected: m.id === currentModel }, m.label);
     modelSel.append(opt);
@@ -278,7 +353,7 @@ function updateModeUI() {
   });
   
   const inp = root.querySelector('#sp-input');
-  if (currentMode === 'text') inp.placeholder = 'Nachricht … /image [prompt]';
+  if (currentMode === 'text') inp.placeholder = 'Nachricht … (Shift+Enter für Zeilenumbruch)';
   else if (currentMode === 'image') inp.placeholder = 'Bildbeschreibung (Prompt) …';
   else if (currentMode === 'video') inp.placeholder = 'Videobeschreibung (Prompt) …';
 }
@@ -320,7 +395,11 @@ function renderMessages() {
   const box = root.querySelector('#sp-messages');
   box.innerHTML = '';
   if (!currentMessages.length) {
-    box.innerHTML = `<div class="sp-empty"><div class="icon">👄</div><h2>sprecher</h2><p>Claude · Grok · Bilder</p></div>`;
+    if (!hasAnyModels()) {
+      box.innerHTML = `<div class="sp-empty"><div class="icon">🔑</div><h2>Keine Modelle verfügbar</h2><p style="max-width:280px;">Mindestens einen API Key im <strong style="color:#00d4c8;">Setup</strong> hinterlegen — dann stehen Anthropic, Grok, OpenAI und Gemini zur Auswahl.</p></div>`;
+    } else {
+      box.innerHTML = `<div class="sp-empty"><div class="icon">👄</div><h2>sprecher</h2><p>Claude · Grok · Bilder — wähle ein Modell und fang an.</p></div>`;
+    }
     return;
   }
   for (const m of currentMessages) appendMsgEl(m);
@@ -416,10 +495,13 @@ async function loadSession(sid) {
     const { session, messages } = await api.getSession(sid);
     currentSid = sid;
     currentMessages = messages || [];
+    currentSystemPrompt = session.systemPrompt || '';
     root.querySelector('#sp-title').textContent = session.title || 'Neues Gespräch';
-    
+    const sysInp = root.querySelector('#sp-system-input');
+    if (sysInp) sysInp.value = currentSystemPrompt;
+
     restoreModel(session.model);
-    
+
     renderSessionList();
     renderMessages();
   } catch (e) { toast('Session laden: ' + e.message, 'fail'); }
@@ -428,6 +510,7 @@ async function loadSession(sid) {
 // ── Senden ────────────────────────────────────────────────────────────
 async function sendMessage() {
   if (streaming) return;
+  if (!hasAnyModels()) { toast('Bitte zuerst einen API Key im Setup hinterlegen.', 'fail'); return; }
   const input = root.querySelector('#sp-input');
   const text = input.value.trim();
   if (!text && !pendingAttachments.length) return;
@@ -605,7 +688,7 @@ async function sendMessage() {
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sid: currentSid, model: currentModel, messages: apiMessages }),
+      body: JSON.stringify({ sid: currentSid, model: currentModel, messages: apiMessages, systemPrompt: currentSystemPrompt || undefined }),
     });
     const reader = r.body.getReader();
     const dec = new TextDecoder();
@@ -721,28 +804,54 @@ export function initSprecher() {
     root.querySelector('#sp-input').focus();
   };
 
-  root.querySelector('#sp-title').onclick = async () => {
+  root.querySelector('#sp-title').onclick = () => {
     if (!currentSid) return;
-    const newTitle = prompt('Titel:', root.querySelector('#sp-title').textContent);
-    if (!newTitle?.trim()) return;
-    root.querySelector('#sp-title').textContent = newTitle.trim();
-    await api.saveSession(currentSid, { title: newTitle.trim(), model: currentModel });
-    const s = sessions.find(x => x.sid === currentSid);
-    if (s) s.title = newTitle.trim();
-    renderSessionList();
+    const titleEl = root.querySelector('#sp-title');
+    startTitleEdit(titleEl, async (newTitle) => {
+      await api.saveSession(currentSid, { title: newTitle, model: currentModel });
+      const s = sessions.find(x => x.sid === currentSid);
+      if (s) s.title = newTitle;
+      renderSessionList();
+    });
   };
+
+  // "Setup öffnen"-Button wenn keine Keys — klickt den ⚙ setup-Link in der Sidebar
+  root.querySelector('#sp-open-setup')?.addEventListener('click', () => {
+    const setupBtn = document.querySelector('#sidebar-foot-label')?.parentElement?.querySelector('button');
+    if (setupBtn) setupBtn.click();
+  });
+
+  // Settings-Button: System-Prompt-Panel toggeln
+  root.querySelector('#sp-settings-btn').onclick = () => {
+    systemPanelOpen = !systemPanelOpen;
+    root.querySelector('#sp-system-panel').classList.toggle('open', systemPanelOpen);
+    root.querySelector('#sp-settings-btn').classList.toggle('active', systemPanelOpen);
+    if (systemPanelOpen) root.querySelector('#sp-system-input').focus();
+  };
+
+  // System-Prompt speichern bei Änderung (debounced)
+  let sysTimer = null;
+  root.querySelector('#sp-system-input').addEventListener('input', (e) => {
+    currentSystemPrompt = e.target.value;
+    if (!currentSid) return;
+    clearTimeout(sysTimer);
+    sysTimer = setTimeout(() => {
+      api.saveSession(currentSid, { systemPrompt: currentSystemPrompt, model: currentModel });
+    }, 600);
+  });
 
   root.querySelector('#sp-send').onclick = sendMessage;
 
   const inp = root.querySelector('#sp-input');
+  const autoResize = () => requestAnimationFrame(() => {
+    inp.style.height = '';
+    inp.style.height = Math.min(inp.scrollHeight, 200) + 'px';
+  });
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-    // Auto-resize
-    requestAnimationFrame(() => {
-      inp.style.height = '';
-      inp.style.height = Math.min(inp.scrollHeight, 200) + 'px';
-    });
+    autoResize();
   });
+  inp.addEventListener('input', autoResize);
 
   // Paste-Bilder
   inp.addEventListener('paste', (e) => {
