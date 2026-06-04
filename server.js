@@ -4,6 +4,7 @@ import net from 'net';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { createRequire } from 'module';
 import 'dotenv/config';
 import { setupAuth } from './auth.js';
 import { SETUP_KEYS } from './setup-config.js';
@@ -12,6 +13,8 @@ import { setupShellLog } from './shell-log.js';
 import { setupSprecher } from './sprecher.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const _require = createRequire(import.meta.url);
+const { version: APP_VERSION } = _require('./package.json');
 
 // Schreibbares Daten-Verzeichnis. Default = Projektordner (npm start / compose).
 // Die Electron-Hülle setzt HAND_DATA_DIR auf userData, weil der App-Ordner
@@ -79,6 +82,9 @@ const wrap = (fn) => async (req, res) => {
 // /api-Endpoints (OrientDB, Tunnels, Submissions) Admin-only.
 // ============================================================
 const authz = setupAuth(app, { odb, dbName: ORIENTDB_DB });
+
+// Öffentlich — wird von main.js vor dem Login abgerufen.
+app.get('/api/version', (_req, res) => res.json({ version: APP_VERSION }));
 
 // sprecher ist FREUND-Level (requireAuth) — VOR dem Admin-Gate registrieren,
 // sonst würde das blanket requireAdmin unten die Routes abschatten.
