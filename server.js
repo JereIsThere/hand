@@ -95,6 +95,29 @@ app.use('/api', authz.requireAdmin());
 const vaultModule   = setupVault(app,    { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
 const shellLogModule  = setupShellLog(app,  { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
 
+// ── Updates ─────────────────────────────────────────────────────────
+// Für Dev-Modus (nicht gepackt): vergleicht aktuelle Version mit letztem GitHub-Release.
+app.get('/api/updates/check', async (_req, res) => {
+  try {
+    const r = await fetch('https://api.github.com/repos/JereIsThere/hand/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'die-hand/' + APP_VERSION },
+    });
+    if (!r.ok) throw new Error(`GitHub ${r.status}`);
+    const release = await r.json();
+    const latest = release.tag_name?.replace(/^v/, '') || release.name;
+    res.json({
+      current: APP_VERSION,
+      latest,
+      hasUpdate: latest !== APP_VERSION,
+      releaseUrl: release.html_url,
+      releaseName: release.name,
+      publishedAt: release.published_at,
+    });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
 // ── Setup-Status ────────────────────────────────────────────────────
 // Gibt zurück welche optionalen Keys gesetzt/fehlend sind (kein Klartext).
 app.get('/api/setup-status', authz.requireAdmin(), async (req, res) => {

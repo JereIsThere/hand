@@ -11,6 +11,7 @@ import { initFriends, activateFriends, deactivateFriends } from '../tools/friend
 import { initVaultUi, activateVaultUi, deactivateVaultUi } from '../tools/vault-ui.js';
 import { initSprecher, activateSprecher, deactivateSprecher } from '../tools/sprecher.js';
 import { initUeber, activateUeber, deactivateUeber } from '../tools/ueber.js';
+import { initUpdates } from '../tools/updates.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
 import { initAuth, isAdmin, me } from '../auth/gate.js';
 import { checkAndShowSetupWizard, initSetupButton } from '../auth/setup.js';
@@ -221,6 +222,7 @@ async function bootstrap() {
       footLabel.textContent = 'hand.jeremias-groehl.de';
     });
   }
+  initUpdates();
   setupProfileMenu(user);
 
   if (isAdmin()) {
