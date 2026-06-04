@@ -214,7 +214,13 @@ async function bootstrap() {
     }
   }
   const footLabel = document.getElementById('sidebar-foot-label');
-  if (footLabel) footLabel.textContent = 'v0.8 · hand.jeremias-groehl.de';
+  if (footLabel) {
+    fetch('/api/version').then(r => r.json()).then(({ version }) => {
+      footLabel.textContent = `v${version} · hand.jeremias-groehl.de`;
+    }).catch(() => {
+      footLabel.textContent = 'hand.jeremias-groehl.de';
+    });
+  }
   setupProfileMenu(user);
 
   if (isAdmin()) {
