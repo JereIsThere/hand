@@ -7,19 +7,28 @@ const sqlStr = (s) => `'${String(s == null ? '' : s).replace(/'/g, "''").slice(0
 const safeId = (s) => String(s).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
 
 // ── Modell-Katalog ─────────────────────────────────────────────────────
-// provider: 'anthropic' | 'xai'.  group: text | image | video.
+// provider: 'anthropic' | 'xai' | 'openai' | 'gemini'.  group: text | image | video.
 const CATALOG = [
-  { id: 'claude-sonnet-4-6', family: 'claude', label: 'Claude Sonnet 4.6', provider: 'anthropic', group: 'text' },
-  { id: 'claude-opus-4-8',   family: 'claude', label: 'Claude Opus 4.8',   provider: 'anthropic', group: 'text' },
-  { id: 'claude-haiku-4-5',  family: 'claude', label: 'Claude Haiku 4.5',  provider: 'anthropic', group: 'text' },
-  { id: 'grok-3',            family: 'grok',   label: 'Grok 3',             provider: 'xai',       group: 'text' },
-  { id: 'grok-3-mini',       family: 'grok',   label: 'Grok 3 Mini',        provider: 'xai',       group: 'text' },
-  { id: 'grok-2-image',      family: 'grok',   label: 'Grok Image',         provider: 'xai',       group: 'image' },
+  { id: 'claude-sonnet-4-6',   family: 'claude',  label: 'Claude Sonnet 4.6',    provider: 'anthropic', group: 'text' },
+  { id: 'claude-opus-4-8',     family: 'claude',  label: 'Claude Opus 4.8',      provider: 'anthropic', group: 'text' },
+  { id: 'claude-haiku-4-5',    family: 'claude',  label: 'Claude Haiku 4.5',     provider: 'anthropic', group: 'text' },
+  { id: 'grok-3',              family: 'grok',    label: 'Grok 3',               provider: 'xai',       group: 'text' },
+  { id: 'grok-3-mini',         family: 'grok',    label: 'Grok 3 Mini',          provider: 'xai',       group: 'text' },
+  { id: 'grok-2-image',        family: 'grok',    label: 'Grok Image',           provider: 'xai',       group: 'image' },
+  { id: 'gpt-4o',              family: 'gpt',     label: 'GPT-4o',               provider: 'openai',    group: 'text' },
+  { id: 'gpt-4o-mini',         family: 'gpt',     label: 'GPT-4o Mini',          provider: 'openai',    group: 'text' },
+  { id: 'o3-mini',             family: 'gpt',     label: 'o3-mini',              provider: 'openai',    group: 'text' },
+  { id: 'gemini-2.0-flash',    family: 'gemini',  label: 'Gemini 2.0 Flash',     provider: 'gemini',    group: 'text' },
+  { id: 'gemini-1.5-pro',      family: 'gemini',  label: 'Gemini 1.5 Pro',       provider: 'gemini',    group: 'text' },
+  { id: 'gemini-1.5-flash',    family: 'gemini',  label: 'Gemini 1.5 Flash',     provider: 'gemini',    group: 'text' },
 ];
 
-const keyFor = (provider) => provider === 'anthropic'
-  ? process.env.ANTHROPIC_API_KEY
-  : (process.env.GROK_API_KEY || process.env.XAI_API_KEY);
+const keyFor = (provider) => {
+  if (provider === 'anthropic') return process.env.ANTHROPIC_API_KEY;
+  if (provider === 'openai')    return process.env.OPENAI_API_KEY;
+  if (provider === 'gemini')    return process.env.GEMINI_API_KEY;
+  return process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+};
 
 function modelById(id) { return CATALOG.find((m) => m.id === id); }
 
@@ -113,6 +122,44 @@ export function setupSprecher(app, { odb, dbName, requireAuth }) {
     });
     if (!upstream.ok) throw new Error(`Anthropic ${upstream.status}: ${(await upstream.text()).slice(0, 200)}`);
     return pipeSSE(upstream, res, (ev) => ev.delta?.text || '');
+  }
+
+  // ── Text-Streaming: OpenAI ─────────────────────────────────────────────
+  async function streamOpenAI({ model, messages, systemPrompt, res }) {
+    const key = keyFor('openai');
+    if (!key) throw new Error('OPENAI_API_KEY fehlt (im Vault/Setup setzen)');
+    const msgs = [...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []), ...toOpenAiStyle(messages)];
+    const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, messages: msgs, stream: true, max_tokens: 8192 }),
+    });
+    if (!upstream.ok) throw new Error(`OpenAI ${upstream.status}: ${(await upstream.text()).slice(0, 200)}`);
+    return pipeSSE(upstream, res, (ev) => ev.choices?.[0]?.delta?.content || '');
+  }
+
+  // ── Text-Streaming: Gemini ─────────────────────────────────────────────
+  function toGemini(messages, systemPrompt) {
+    const contents = (messages || []).map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: Array.isArray(m.content)
+        ? m.content.filter((p) => p.type === 'text').map((p) => ({ text: p.text }))
+        : [{ text: String(m.content || '') }],
+    })).filter((m) => m.parts.length);
+    return { contents, ...(systemPrompt ? { systemInstruction: { parts: [{ text: systemPrompt }] } } : {}) };
+  }
+
+  async function streamGemini({ model, messages, systemPrompt, res }) {
+    const key = keyFor('gemini');
+    if (!key) throw new Error('GEMINI_API_KEY fehlt (im Vault/Setup setzen)');
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?key=${encodeURIComponent(key)}&alt=sse`;
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...toGemini(messages, systemPrompt), generationConfig: { maxOutputTokens: 8192 } }),
+    });
+    if (!upstream.ok) throw new Error(`Gemini ${upstream.status}: ${(await upstream.text()).slice(0, 200)}`);
+    return pipeSSE(upstream, res, (ev) => ev.candidates?.[0]?.content?.parts?.[0]?.text || '');
   }
 
   // ── Text-Streaming: xAI (OpenAI-Format) ────────────────────────────────
@@ -236,6 +283,10 @@ export function setupSprecher(app, { odb, dbName, requireAuth }) {
     try {
       const full = def.provider === 'anthropic'
         ? await streamAnthropic({ model, messages, systemPrompt, res })
+        : def.provider === 'openai'
+        ? await streamOpenAI({ model, messages, systemPrompt, res })
+        : def.provider === 'gemini'
+        ? await streamGemini({ model, messages, systemPrompt, res })
         : await streamXai({ model, messages, systemPrompt, res });
       await appendMessage({ sid, role: 'assistant', content: full, type: 'text', model });
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
