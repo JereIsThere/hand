@@ -1,0 +1,31 @@
+{
+  "appId": "de.jeremias-groehl.hand-dev",
+  "productName": "Die Hand Dev",
+  "directories": {
+    "output": "dist-dev",
+    "buildResources": "build"
+  },
+  "win": {
+    "executableName": "Die Hand Dev",
+    "icon": "build/icon.ico",
+    "target": [
+      { "target": "nsis",     "arch": ["x64"] },
+      { "target": "nsis-web", "arch": ["x64"] }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Die Hand Dev",
+    "uninstallDisplayName": "Die Hand Dev"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "JereIsThere",
+    "repo": "hand",
+    "channel": "beta"
+  }
+}

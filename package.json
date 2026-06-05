@@ -15,7 +15,10 @@
     "make-icon": "node scripts/make-icon.mjs",
     "dist": "electron-builder --win nsis",
     "dist:publish": "electron-builder --win nsis --publish always",
-    "pack": "electron-builder --dir"
+    "dist:dev": "electron-builder --win nsis --config electron-builder.dev.json",
+    "dist:dev:publish": "electron-builder --win nsis --config electron-builder.dev.json --publish always",
+    "pack": "electron-builder --dir",
+    "pack:dev": "electron-builder --dir --config electron-builder.dev.json"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
