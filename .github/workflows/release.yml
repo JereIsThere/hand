@@ -43,7 +43,7 @@ jobs:
             echo "channel=latest" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
             echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-            echo "publish=always" >> "$GITHUB_OUTPUT"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
           else
             BASE=$(node -p "require('./package.json').version")
             SHORT_SHA=${GITHUB_SHA::7}
@@ -51,11 +51,11 @@ jobs:
             echo "channel=beta" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "version=${BETA_VERSION}" >> "$GITHUB_OUTPUT"
-            echo "publish=always" >> "$GITHUB_OUTPUT"
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Bump version (beta only)
-        if: steps.relmeta.outputs.channel == 'beta'
+        if: steps.relmeta.outputs.is_tag == 'false'
         shell: bash
         run: |
           node -e "const fs=require('fs');const p=require('./package.json');p.version='${{ steps.relmeta.outputs.version }}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
@@ -63,7 +63,8 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Build & publish
+      # ── Prod-Installer ───────────────────────────────────────────────
+      - name: Build & publish prod installer
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -71,3 +72,27 @@ jobs:
         run: |
           npx electron-builder --win nsis --publish always \
             --config.publish.channel=${{ steps.relmeta.outputs.channel }}
+
+      # ── Dev-Installer ────────────────────────────────────────────────
+      # Wird als zusätzlicher Asset in dieselbe Release hochgeladen (kein eigenes Release).
+      - name: Build dev installer
+        shell: bash
+        run: |
+          npx electron-builder --win nsis --config electron-builder.dev.json
+
+      - name: Upload dev installer to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Tag-Release: gh release upload auf den Tag
+          # Beta-Push: auf das soeben von electron-builder erstellte Pre-Release
+          if [[ "${{ steps.relmeta.outputs.is_tag }}" == "true" ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            # electron-builder erstellt das Release mit der beta-Version als Tag
+            TAG="v${{ steps.relmeta.outputs.version }}"
+          fi
+          # Warte kurz bis das Release sicher existiert
+          sleep 5
+          gh release upload "$TAG" dist-dev/*.exe --clobber
