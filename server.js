@@ -4,6 +4,7 @@ import net from 'net';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { createRequire } from 'module';
 import 'dotenv/config';
 import { setupAuth } from './auth.js';
 import { SETUP_KEYS } from './setup-config.js';
@@ -12,6 +13,8 @@ import { setupShellLog } from './shell-log.js';
 import { setupSprecher } from './sprecher.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const _require = createRequire(import.meta.url);
+const { version: APP_VERSION } = _require('./package.json');
 
 // Schreibbares Daten-Verzeichnis. Default = Projektordner (npm start / compose).
 // Die Electron-Hülle setzt HAND_DATA_DIR auf userData, weil der App-Ordner
@@ -80,6 +83,9 @@ const wrap = (fn) => async (req, res) => {
 // ============================================================
 const authz = setupAuth(app, { odb, dbName: ORIENTDB_DB });
 
+// Öffentlich — wird von main.js vor dem Login abgerufen.
+app.get('/api/version', (_req, res) => res.json({ version: APP_VERSION }));
+
 // sprecher ist FREUND-Level (requireAuth) — VOR dem Admin-Gate registrieren,
 // sonst würde das blanket requireAdmin unten die Routes abschatten.
 const sprecherModule  = setupSprecher(app,  { odb, dbName: ORIENTDB_DB, requireAuth: authz.requireAuth });
@@ -88,6 +94,29 @@ const sprecherModule  = setupSprecher(app,  { odb, dbName: ORIENTDB_DB, requireA
 app.use('/api', authz.requireAdmin());
 const vaultModule   = setupVault(app,    { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
 const shellLogModule  = setupShellLog(app,  { odb, dbName: ORIENTDB_DB, requireAdmin: authz.requireAdmin });
+
+// ── Updates ─────────────────────────────────────────────────────────
+// Für Dev-Modus (nicht gepackt): vergleicht aktuelle Version mit letztem GitHub-Release.
+app.get('/api/updates/check', async (_req, res) => {
+  try {
+    const r = await fetch('https://api.github.com/repos/JereIsThere/hand/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'die-hand/' + APP_VERSION },
+    });
+    if (!r.ok) throw new Error(`GitHub ${r.status}`);
+    const release = await r.json();
+    const latest = release.tag_name?.replace(/^v/, '') || release.name;
+    res.json({
+      current: APP_VERSION,
+      latest,
+      hasUpdate: latest !== APP_VERSION,
+      releaseUrl: release.html_url,
+      releaseName: release.name,
+      publishedAt: release.published_at,
+    });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
 
 // ── Setup-Status ────────────────────────────────────────────────────
 // Gibt zurück welche optionalen Keys gesetzt/fehlend sind (kein Klartext).

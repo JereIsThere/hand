@@ -26,11 +26,17 @@ for (const p of [path.join(dataDir, '.env'), path.join(projectRoot, '.env')]) {
   if (fs.existsSync(p)) { dotenv.config({ path: p }); break; }
 }
 
-// Update-Channel aus userData/channel.json ('latest' = prod, 'beta' = dev)
+// Dev-Client erkennen: productName aus electron-builder.dev.json → app.name = "Die Hand Dev"
+const IS_DEV_CLIENT = app.name === 'Die Hand Dev';
+const DEFAULT_CHANNEL = IS_DEV_CLIENT ? 'beta' : 'latest';
+
+// Update-Channel aus userData/channel.json
+// Dev-Client: Default 'beta', Prod-Client: Default 'latest'
+// userData-Pfade sind getrennt (app.name verschieden) → kein Konflikt
 const CHANNEL_FILE = path.join(dataDir, 'channel.json');
 function readChannel() {
-  try { return JSON.parse(fs.readFileSync(CHANNEL_FILE, 'utf8')).channel || 'latest'; }
-  catch { return 'latest'; }
+  try { return JSON.parse(fs.readFileSync(CHANNEL_FILE, 'utf8')).channel || DEFAULT_CHANNEL; }
+  catch { return DEFAULT_CHANNEL; }
 }
 function writeChannel(c) {
   fs.writeFileSync(CHANNEL_FILE, JSON.stringify({ channel: c }));
@@ -61,7 +67,7 @@ function splashStatus(msg) {
 async function createWindow(port) {
   win = new BrowserWindow({
     width: 1280, height: 860, minWidth: 900, minHeight: 600,
-    title: 'Die Hand', backgroundColor: '#06000e',
+    title: IS_DEV_CLIENT ? 'Die Hand Dev' : 'Die Hand', backgroundColor: '#06000e',
     autoHideMenuBar: true, show: false,
     icon: path.join(projectRoot, 'build', 'icon.ico'),
     webPreferences: {
