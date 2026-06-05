@@ -90,7 +90,7 @@ async function renderChannelCard() {
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:700;color:#e8e0f0;">Update-Kanal</div>
           <div style="font-size:11px;color:#9a8fb5;margin-top:2px;">
-            Aktiv: <strong style="color:${col};">${isBeta ? 'beta — Pre-Releases' : 'latest — stabil'}</strong>
+            Aktiv: <strong style="color:${col};">${isBeta ? 'dev — Pre-Releases' : 'prod — stabil'}</strong>
           </div>
         </div>
         <button id="upd-check-btn"
@@ -106,7 +106,7 @@ async function renderChannelCard() {
                  background:${!isBeta ? 'rgba(0,212,200,.12)' : '#0a0118'};
                  color:${!isBeta ? '#00d4c8' : '#6f6488'};
                  font-weight:${!isBeta ? '700' : '400'};font-size:13px;">
-          🟢 latest<br>
+          🟢 prod<br>
           <span style="font-size:10px;font-weight:400;opacity:.75;">Stabile Releases<br>empfohlen</span>
         </button>
         <button data-ch="beta" class="ch-btn"
@@ -115,7 +115,7 @@ async function renderChannelCard() {
                  background:${isBeta ? 'rgba(212,162,0,.10)' : '#0a0118'};
                  color:${isBeta ? '#d4a200' : '#6f6488'};
                  font-weight:${isBeta ? '700' : '400'};font-size:13px;">
-          🟡 beta<br>
+          🟡 dev<br>
           <span style="font-size:10px;font-weight:400;opacity:.75;">Pre-Releases<br>neue Features früher</span>
         </button>
       </div>
