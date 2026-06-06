@@ -37,6 +37,8 @@ const {
   SSH_LOCAL_PORT = '2480',
   SSH_REMOTE_HOST = 'localhost',
   SSH_REMOTE_PORT = '2480',
+  GITHUB_TOKEN = '',
+  GITHUB_REPO = 'JereIsThere/auge',
 } = process.env;
 
 const auth = 'Basic ' + Buffer.from(`${ORIENTDB_USER}:${ORIENTDB_PASS}`).toString('base64');
@@ -253,6 +255,87 @@ async function putDoc(rid, doc) {
   });
 }
 
+// ── GitHub-Build: Submission → meta.ts-Skelett → PR → buildRef ────────
+
+async function ghApi(path, init = {}) {
+  if (!GITHUB_TOKEN) throw Object.assign(new Error('GITHUB_TOKEN nicht gesetzt'), { status: 500 });
+  const res = await fetch(`https://api.github.com${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
+  });
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch { data = text; }
+  if (!res.ok) throw Object.assign(new Error(`GitHub ${res.status}: ${JSON.stringify(data).slice(0, 300)}`), { status: 502 });
+  return data;
+}
+
+function buildMetaTs(doc) {
+  const KAT = ['cs', 'art', 'math', 'sprache', 'sonstiges'];
+  const kat = KAT.includes((doc.kategorie || '').toLowerCase()) ? doc.kategorie.toLowerCase() : 'sonstiges';
+  const clean = (s) => String(s || '').replace(/['"\\`]/g, '').replace(/\s+/g, ' ').trim();
+  const slug   = clean(doc.slug);
+  const titel  = clean(doc.titel);
+  const kurz   = clean(doc.beschreibung).slice(0, 120) || `${titel} — aus Submission.`;
+  const von    = clean(doc.vorgeschlagenVon);
+
+  let out = `import type { Thema } from '@/types';\n\n`;
+  out += `// Skelett aus Auge-Submission (Build). Bitte ausbauen.\n`;
+  if (von) out += `// Vorgeschlagen von: ${von}\n`;
+  out += `// TODO: gruppen + Lektionen füllen, in themen/index.ts registrieren, status hochsetzen.\n\n`;
+  out += `const thema: Thema = {\n`;
+  out += `  slug: '${slug}',\n`;
+  out += `  titel: '${titel}',\n`;
+  out += `  kategorie: '${kat}',\n`;
+  out += `  kurzbeschreibung: '${kurz}',\n`;
+  out += `  status: 'kommt-noch',\n`;
+  out += `  gruppen: [],\n`;
+  out += `};\n\nexport default thema;\n`;
+  return out;
+}
+
+async function buildSubmission(rid, doc) {
+  const slug = doc.slug;
+  if (!slug) throw new Error('Submission hat keinen slug');
+
+  const branch   = `submission/${slug}-${Date.now().toString(36)}`;
+  const filePath = `themen/${slug}/meta.ts`;
+
+  const refData  = await ghApi(`/repos/${GITHUB_REPO}/git/ref/heads/main`);
+  await ghApi(`/repos/${GITHUB_REPO}/git/refs`, {
+    method: 'POST',
+    body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: refData.object.sha }),
+  });
+  await ghApi(`/repos/${GITHUB_REPO}/contents/${filePath}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      message: `Skelett: Thema ${doc.titel} aus Submission`,
+      content: Buffer.from(buildMetaTs(doc), 'utf8').toString('base64'),
+      branch,
+    }),
+  });
+
+  let prBody = `Auto-generiert aus einer Auge-Submission (Die Hand).\n\n`;
+  prBody += `- Slug: ${slug}\n- Kategorie: ${doc.kategorie || 'sonstiges'}\n- Datei: ${filePath}\n`;
+  if (doc.vorgeschlagenVon) prBody += `- Vorgeschlagen von: ${doc.vorgeschlagenVon}\n`;
+  prBody += `\n### Zum Fertigstellen\n1. ${filePath} ausbauen: gruppen mit Lektionen füllen.\n`;
+  prBody += `2. Lektions-Components unter components/kurse/${slug}/ anlegen.\n`;
+  prBody += `3. In themen/index.ts importieren und registrieren.\n4. status auf in-arbeit setzen.\n`;
+
+  const pr = await ghApi(`/repos/${GITHUB_REPO}/pulls`, {
+    method: 'POST',
+    body: JSON.stringify({ title: `Themen-Skelett: ${doc.titel}`, head: branch, base: 'main', body: prBody }),
+  });
+
+  await putDoc(rid, { ...doc, status: 'built', buildRef: pr.html_url });
+  return { prUrl: pr.html_url, prNumber: pr.number, branch, path: filePath };
+}
+
 app.get('/api/submissions', wrap(async (req) => {
   const status = SUBMISSION_STATI.includes(req.query.status) ? req.query.status : null;
   const where = status ? ` WHERE status = '${status}'` : '';
@@ -292,9 +375,20 @@ app.post('/api/submissions/:rid/approve', wrap(async (req) => {
   doc.status = 'approved';
   doc.decidedAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
   const saved = await putDoc(req.params.rid, doc);
-  // Build-Trigger entfernt — der Theme-Skelett-Build läuft künftig über gehirn,
-  // nicht mehr über n8n. Approve setzt vorerst nur den Status.
-  return { record: saved };
+
+  let build = null;
+  if (GITHUB_TOKEN) {
+    try {
+      build = await buildSubmission(req.params.rid, saved);
+    } catch (e) {
+      console.error('[approve] build failed:', e.message);
+      build = { error: e.message };
+    }
+  } else {
+    build = { skipped: true, reason: 'GITHUB_TOKEN nicht gesetzt' };
+  }
+
+  return { record: saved, build };
 }));
 
 app.post('/api/submissions/:rid/reject', wrap(async (req) => {
