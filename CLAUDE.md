@@ -1,22 +1,70 @@
 # Die Hand — für Claude
 
-Tool-Management-Shell und Admin-Tool für das Auge-Ökosystem. Express.js-Backend,
-Vanilla-JS-Frontend. Lauscht auf Port 3737.
+Persönliches Cockpit. Express.js-Backend, Vanilla-JS-Frontend, Electron-Wrapper.
+Port 3737 (Web) · Electron-App (Desktop).
 
-**Klammer-Repo:** Dieses Repo ist ein Submodule von [JereIsThere/auge-framework](https://github.com/JereIsThere/auge-framework), dem Umbrella-Repo (docker-compose, ADRs, Runbooks). Architektur-Entscheidungen und Submission-Pipeline-Runbook dort.
+**Klammer-Repo:** Submodule von [JereIsThere/auge-framework](https://github.com/JereIsThere/auge-framework) — docker-compose, ADRs, Runbooks dort.
 
 ---
 
-## Was die Hand tut
+## Tabs (UI-Struktur)
 
-| Tool (Tab in der UI) | Funktion |
-|----------------------|----------|
-| **OrientDB** | Schema-Browser, Records-Tabelle, Editor (typisiert + Raw-JSON), Klassen-Wizard, SQL/Gremlin-Konsole |
-| **SSH-Tunnel** | Tunnel-Manager: managed (aus `.env`) + unmanaged (aus UI) |
-| **Auge-Submissions** | Themen-Vorschläge für auge listen, genehmigen (→ n8n-Build-Webhook) oder ablehnen |
-| **Projects / Funkner** | Externe Seiten per iframe eingebettet (lazy, mit X-Frame-Fallback) |
+| Tab | Status | Funktion |
+|-----|--------|----------|
+| **Sprecher** | bleibt | Chat mit Mode-Selector 📝🖼️🎬 + Modell-Dropdown via gehirn-API |
+| **Funkner** | umbau `[impl-ready]` | Wird Claude-Code-inspiriertes Terminal-Fenster (Placeholder, keine Logik) |
+| **Projekte** | bleibt | Roadmap-Cockpit, dann2-Integration per iframe |
+| **Vault** | bleibt | Persönlicher Vault (Notizen, Snippets) via OrientDB |
+| **Friends** | bleibt | Kontakte / Presence |
+| **Über** | bleibt | App-Info, Update-Channel, Version |
+| ~~OrientDB~~ | zieht zu gehirn-admin | Schema, Records, Query — nach Fertigstellung von gehirn-admin |
+| ~~SSH-Tunnel~~ | zieht zu gehirn-admin | Tunnel-Manager — nach Fertigstellung von gehirn-admin |
+| ~~Submissions~~ | zieht zu gehirn-admin | Auge-Themen-Pipeline — nach Fertigstellung von gehirn-admin |
 
-Daneben: **Zettel** (`scripts/zettel/`) — eigenständige Windows-Sticky-Note (WPF/PowerShell), nicht Teil der Web-Shell.
+> **Übergangsphase:** OrientDB, SSH-Tunnel und Submissions bleiben in hand
+> bis gehirn-admin fertig ist. Dann werden sie dort weitergebaut und hier entfernt.
+
+### Funkner-Tab (Umbau-Spec)
+
+Aktuell: iframe-Embed auf `https://funkner.jeremias-groehl.de`.
+
+Ziel: **Claude-Code-inspiriertes Terminal-Fenster** — visueller Placeholder ohne Logik.
+- Dunkles Terminal-Look (analog Claude Code CLI)
+- Eingabezeile unten mit Prompt-Symbol (`⚡ >`)
+- Keine echte CLI-Anbindung — Output statisch / fake-animiert
+- Sieht aus wie ein Agent-Interface, ist aber ein Design-Stub für spätere funkner-Integration
+- Implementierung: impl-cli-Session, `public/tools/funkner.js` + Styles in `styles.css`
+
+---
+
+## Electron-Wrapper (bereits vorhanden)
+
+```
+electron/
+  main.mjs      Hauptprozess: startet Express in-process, öffnet BrowserWindow
+  preload.mjs   IPC-Bridge (contextBridge, sicher)
+  splash.html   Splash-Screen beim Start
+```
+
+- `electron-updater` mit `autoUpdater` — Update-Kanal: `latest` (Prod) / `beta` (Dev)
+- Dev-Client: `app.name = "Die Hand Dev"` via `electron-builder.dev.json`
+- `.env` wird aus `userData/` geladen (gepackt) oder Projekt-Root (Dev)
+- Single-Instance-Lock: zweite Instanz fokussiert das bestehende Fenster
+
+**Electron starten (Dev):**
+```bash
+npm run electron        # oder: npx electron .
+```
+
+**Build:**
+```bash
+npm run build           # → dist/
+```
+
+> **Hinweis:** Der Electron-Wrapper ist Vorlage für `auge-framework/auge-app/`.
+> Das Ziel ist, die Shell (main.mjs, preload.mjs, updater) in einen gemeinsamen
+> Ordner zu extrahieren, den hand und gehirn-admin beide nutzen.
+> ADR: [auge-framework/docs/adr/0005-auge-app.md](https://github.com/JereIsThere/auge-framework/blob/main/docs/adr/0005-auge-app.md)
 
 ---
 
@@ -24,31 +72,36 @@ Daneben: **Zettel** (`scripts/zettel/`) — eigenständige Windows-Sticky-Note (
 
 ```
 hand/
-├── server.js                 Express-Server (OrientDB-Proxy, TunnelManager, Submissions)
-├── Dockerfile                Container für auge-framework docker-compose
-├── .env.example
-├── package.json
+├── server.js               Express-Server (OrientDB-Proxy, TunnelManager, Submissions, Vault)
+├── sprecher.js             Sprecher-Backend (KI-Calls via gehirn-API)
+├── vault.js                Vault-Backend (OrientDB-Snippets)
+├── auth.js                 Auth-Schicht (optional)
+├── Dockerfile              Container für compose-Stack
+├── electron/               Desktop-Wrapper (→ oben)
 ├── public/
-│   ├── index.html            Sidebar-Shell mit Tool-Sections
+│   ├── index.html          Sidebar-Shell
 │   ├── styles.css
-│   ├── app/main.js           Shell-Init + Tool-Switching
+│   ├── app/                Shell-Init, Tool-Switching, Auth
 │   ├── tools/
-│   │   ├── tunnels.js        SSH-Tunnel-Tab
-│   │   └── submissions.js    Auge-Submissions-Tab
-│   ├── features/             OrientDB-Feature-Slices
+│   │   ├── sprecher.js     Sprecher-Tab
+│   │   ├── funkner.js      Funkner-Tab (Placeholder → Claude-Code-UI)
+│   │   ├── tunnels.js      SSH-Tunnel-Tab (→ gehirn-admin)
+│   │   ├── submissions.js  Submissions-Tab (→ gehirn-admin)
+│   │   ├── vault-ui.js     Vault-Tab
+│   │   ├── friends.js      Friends-Tab
+│   │   ├── embed.js        Iframe-Embed-Wrapper (Projekte)
+│   │   └── ueber.js        Über-Tab (Version, Update-Channel)
+│   ├── features/           OrientDB-Feature-Slices (→ gehirn-admin)
 │   │   ├── schema.js
 │   │   ├── records.js
 │   │   ├── editor.js
 │   │   ├── query.js
 │   │   └── class-wizard.js
 │   └── shared/
-│       ├── api.js            OrientDB fetch-Wrapper
-│       └── ui.js             DOM-Helper, toast
+│       ├── api.js          OrientDB fetch-Wrapper
+│       └── ui.js           DOM-Helper, toast
 └── scripts/
-    ├── install.ps1           Windows-Startmenü-Verknüpfung
-    ├── start.cmd
-    ├── uninstall.ps1
-    └── zettel/               Eigenständige WPF-Sticky-Note (Windows)
+    └── zettel/             Eigenständige WPF-Sticky-Note (Windows)
 ```
 
 ---
@@ -59,19 +112,13 @@ hand/
 git clone https://github.com/JereIsThere/hand.git
 cd hand
 npm install
-cp .env.example .env
-# .env editieren: ORIENTDB_PASS, ORIENTDB_DB, ggf. SSH_HOST, N8N_BUILD_WEBHOOK
-npm start
-# → http://localhost:3737
+cp .env.example .env     # ORIENTDB_PASS, GEHIRN_URL etc. setzen
+npm start                # → http://localhost:3737
 ```
 
-### Via auge-framework docker-compose (empfohlen für Vollstack)
-
+Via auge-framework compose (empfohlen für Vollstack):
 ```bash
-# im auge-framework-Root:
-cp .env.example .env && docker compose up -d --build
-# hand läuft auf http://localhost:3737
-# OrientDB auf http://localhost:2480, n8n auf http://localhost:5678
+docker compose up -d --build
 ```
 
 ---
@@ -79,16 +126,18 @@ cp .env.example .env && docker compose up -d --build
 ## Wichtige Env-Vars
 
 ```
-ORIENTDB_URL=http://localhost:2480    # im compose: http://orientdb:2480
+PORT=3737
+ORIENTDB_URL=http://localhost:2480    # compose: http://orientdb:2480
 ORIENTDB_USER=root
 ORIENTDB_PASS=...                     # Pflicht
 ORIENTDB_DB=auge
-PORT=3737
 
-N8N_BUILD_WEBHOOK=...                 # POST-URL für Submission-Approve-Event
-                                      # leer → Status nur auf approved, kein Build
+GEHIRN_URL=http://localhost:4000      # für Sprecher-Tab
 
-SSH_HOST=                             # opt. managed SSH-Tunnel (OrientDB-Forwarding)
+N8N_BUILD_WEBHOOK=...                 # Submissions-Approve → n8n-Build
+                                      # leer → kein Build, nur approved
+
+SSH_HOST=                             # opt. managed Tunnel
 SSH_USER=deploy
 SSH_PORT=22
 SSH_LOCAL_PORT=2480
@@ -98,84 +147,55 @@ SSH_REMOTE_PORT=2480
 
 ---
 
-## API-Referenz
+## API-Referenz (verbleibend in hand)
 
-### OrientDB-Proxy
-
-| Methode | Pfad | Was |
-|---------|------|-----|
-| GET | `/api/info` | Connection-Test + DB-Info |
-| GET | `/api/classes` | Klassen + Properties |
-| GET | `/api/records?class=` | SELECT FROM Klasse, paged |
-| GET | `/api/count?class=` | count(*) |
-| GET | `/api/record/:rid` | Einzelner Record |
-| POST | `/api/record` | Neuer Record (Body = Doc mit @class) |
-| PUT | `/api/record/:rid` | Update |
-| DELETE | `/api/record/:rid` | Löschen |
-| POST | `/api/query` | `{ command, language }` ausführen |
-
-### Tunnels
+### Sprecher
 
 | Methode | Pfad | Was |
 |---------|------|-----|
-| GET | `/api/tunnels` | Alle Tunnel inkl. Status |
-| POST | `/api/tunnels` | Neuer Tunnel (persistiert in tunnels.json) |
-| PUT | `/api/tunnels/:id` | Update (nur unmanaged, nur wenn gestoppt) |
-| DELETE | `/api/tunnels/:id` | Entfernen (nur unmanaged) |
-| POST | `/api/tunnels/:id/start` | ssh-Prozess spawnen, Port-Probe |
-| POST | `/api/tunnels/:id/stop` | ssh-Prozess killen |
-| GET | `/api/tunnels/:id/log` | Tail stdout/stderr (letzte 80 Zeilen) |
+| POST | `/api/sprecher/chat` | Proxy zu gehirn `/gen/text` mit SSE-Streaming |
+| GET | `/api/sprecher/models` | Proxy zu gehirn `/models` |
 
-### Submissions (Auge-Themen-Pipeline)
+### Vault
 
 | Methode | Pfad | Was |
 |---------|------|-----|
-| GET | `/api/submissions?status=` | Listen (pending/approved/rejected/built) |
-| POST | `/api/submissions` | Neuer Vorschlag `{ slug, titel, kategorie?, beschreibung?, vorgeschlagenVon? }` → `pending` |
-| POST | `/api/submissions/:rid/approve` | Genehmigen → `approved`, triggert `N8N_BUILD_WEBHOOK` |
-| POST | `/api/submissions/:rid/reject` | Ablehnen `{ grund? }` → `rejected` |
+| GET | `/api/vault` | Alle Einträge |
+| POST | `/api/vault` | Neuer Eintrag |
+| DELETE | `/api/vault/:id` | Löschen |
 
-Das `Submission`-Schema wird beim Server-Boot idempotent in OrientDB angelegt.
+### OrientDB-Proxy / Tunnels / Submissions
+
+→ Bis zur Fertigstellung von gehirn-admin hier. Vollständige API-Doku:
+in der bisherigen Doku erhalten, nach Migration in gehirn/CLAUDE.md.
 
 ---
 
 ## Architektur-Notizen
 
-### Submissions-Flow (Hand als Glied)
+### Submissions-Flow (bleibt bis gehirn-admin fertig)
 
 ```
-User (Hand-UI)
-  POST /api/submissions
-    → OrientDB Submission-Vertex (status: pending)
-
-Admin (Hand-UI) — genehmigt
-  POST /api/submissions/:rid/approve
-    → OrientDB status: approved
-    → POST N8N_BUILD_WEBHOOK { event: 'submission.approved', submission }
-      → n8n baut Skelett-PR auf auge
+User → POST /api/submissions → OrientDB (pending)
+Admin → POST /api/submissions/:rid/approve → OrientDB (approved) + N8N_BUILD_WEBHOOK
 ```
 
-Vollständiges Runbook: [auge-framework/docs/submission-pipeline.md](https://github.com/JereIsThere/auge-framework/blob/main/docs/submission-pipeline.md)
-
-### SSH-Tunnel-Manager
-
-- **managed**: aus `.env` (`SSH_HOST` gesetzt) — startet automatisch beim Server-Boot.
-- **unmanaged**: über UI angelegt, persistiert in `tunnels.json` (gitignored).
-- Bei Tunnel-Tod im Betrieb: UI zeigt `error`, manuell im Tab neu starten.
-- `BatchMode=yes` — SSH-Key-Auth Pflicht, kein Passwort-Prompt.
+Runbook: [auge-framework/docs/submission-pipeline.md](https://github.com/JereIsThere/auge-framework/blob/main/docs/submission-pipeline.md)
 
 ---
 
 ## Sicherheitshinweise
 
-- Hand lauscht auf `localhost`, **keine eigene Auth-Schicht**. Nicht öffentlich exposen.
-- `DELETE`/`PUT` auf Records sind sofort und ohne Undo.
-- `tunnels.json` enthält Hostnames + User — bewusst gitignored, lokal lesbar.
+- Hand lauscht auf `localhost` — **keine eigene Auth-Schicht für Admin-Tabs**. Nicht öffentlich exposen.
+- `DELETE`/`PUT` auf Records: sofort, kein Undo.
+- `tunnels.json` gitignored (enthält Hostnames).
 
 ---
 
-## Vision / offene Punkte
+## Offene Punkte
 
-- **Casual-User-Seite:** Eine read-only Variante der Shell für normale User, um Themen-Requests für auge einzureichen. Geplant, noch nicht gebaut.
-- **`buildRef` zurückschreiben:** n8n-Workflow trägt die PR-URL noch nicht in den Submission-Vertex zurück (Status bleibt `approved` statt `built`).
-- **Weitere Tools:** Postgres, n8n-Trigger, Log-Viewer als zusätzliche Sidebar-Items.
+- `[impl-ready]` Funkner-Tab → Claude-Code-Placeholder UI (s. Spec oben)
+- `[impl-ready]` OrientDB/SSH/Submissions → nach gehirn-admin migrieren, hier entfernen
+- `[implementieren]` `buildRef` zurückschreiben (n8n-PR-URL in Submission-Vertex)
+- `[implementieren]` Casual-User-Seite (Themen einreichen ohne Admin-Zugang)
+- `[ausarbeiten]` auge-app: Electron-Shell aus hand extrahieren → ADR 0005
