@@ -1,0 +1,17 @@
+name: Notify auge-framework
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch submodule-updated
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${{ secrets.FRAMEWORK_PAT }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/JereIsThere/auge-framework/dispatches \
+            -d '{"event_type":"submodule-updated","client_payload":{"service":"hand"}}'
