@@ -15,6 +15,11 @@ const CATALOG = [
   { id: 'grok-3',              family: 'grok',    label: 'Grok 3',               provider: 'xai',       group: 'text' },
   { id: 'grok-3-mini',         family: 'grok',    label: 'Grok 3 Mini',          provider: 'xai',       group: 'text' },
   { id: 'grok-2-image',        family: 'grok',    label: 'Grok Image',           provider: 'xai',       group: 'image' },
+  { id: 'flux-2-pro',         family: 'atlascloud', label: 'Flux 2 Pro',          provider: 'atlascloud', group: 'image' },
+  { id: 'imagen-4-ultra',     family: 'atlascloud', label: 'Imagen 4 Ultra',      provider: 'atlascloud', group: 'image' },
+  { id: 'ideogram-v3',        family: 'atlascloud', label: 'Ideogram v3',         provider: 'atlascloud', group: 'image' },
+  { id: 'z-image-turbo',      family: 'atlascloud', label: 'Z-Image Turbo',       provider: 'atlascloud', group: 'image' },
+  { id: 'seedream-5',         family: 'atlascloud', label: 'Seedream 5',          provider: 'atlascloud', group: 'image' },
   { id: 'gpt-4o',              family: 'gpt',     label: 'GPT-4o',               provider: 'openai',    group: 'text' },
   { id: 'gpt-4o-mini',         family: 'gpt',     label: 'GPT-4o Mini',          provider: 'openai',    group: 'text' },
   { id: 'o3-mini',             family: 'gpt',     label: 'o3-mini',              provider: 'openai',    group: 'text' },
@@ -24,9 +29,10 @@ const CATALOG = [
 ];
 
 const keyFor = (provider) => {
-  if (provider === 'anthropic') return process.env.ANTHROPIC_API_KEY;
-  if (provider === 'openai')    return process.env.OPENAI_API_KEY;
-  if (provider === 'gemini')    return process.env.GEMINI_API_KEY;
+  if (provider === 'anthropic')  return process.env.ANTHROPIC_API_KEY;
+  if (provider === 'openai')     return process.env.OPENAI_API_KEY;
+  if (provider === 'gemini')     return process.env.GEMINI_API_KEY;
+  if (provider === 'atlascloud') return process.env.ATLASCLOUD_API_KEY;
   return process.env.GROK_API_KEY || process.env.XAI_API_KEY;
 };
 
@@ -200,8 +206,22 @@ export function setupSprecher(app, { odb, dbName, requireAuth }) {
     return full;
   }
 
-  // ── Bild-Generierung: xAI ──────────────────────────────────────────────
+  // ── Bild-Generierung ───────────────────────────────────────────────────
   async function generateImage({ model, prompt }) {
+    const def = modelById(model);
+    if (def?.provider === 'atlascloud') {
+      const key = keyFor('atlascloud');
+      if (!key) throw new Error('ATLASCLOUD_API_KEY fehlt (im Vault/Setup setzen)');
+      const upstream = await fetch('https://api.atlascloud.ai/v1/images/generations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ model, prompt, n: 1 }),
+      });
+      if (!upstream.ok) throw new Error(`Atlas Cloud ${upstream.status}: ${(await upstream.text()).slice(0, 200)}`);
+      const data = await upstream.json();
+      return data.data?.[0]?.url || '';
+    }
+    // xAI (default)
     const key = keyFor('xai');
     if (!key) throw new Error('GROK_API_KEY fehlt (im Vault/Setup setzen)');
     const upstream = await fetch('https://api.x.ai/v1/images/generations', {
