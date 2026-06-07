@@ -154,7 +154,22 @@ SSH_REMOTE_PORT=2480
 | Methode | Pfad | Was |
 |---------|------|-----|
 | POST | `/api/sprecher/chat` | Proxy zu gehirn `/gen/text` mit SSE-Streaming |
-| GET | `/api/sprecher/models` | Proxy zu gehirn `/models` |
+| POST | `/api/sprecher/image` | Proxy zu gehirn `/gen/image` — wählt Modell per Dropdown |
+| GET | `/api/sprecher/models` | Proxy zu gehirn `/models` (text + image, alle Provider) |
+
+**Image-Modelle im Sprecher-Dropdown** — kommen aus gehirn `/models`, automatisch
+verfügbar wenn der jeweilige Key gesetzt ist:
+
+| Modell | Anbieter | Tier |
+|--------|----------|------|
+| grok-2-image-1212 | xAI | normal |
+| flux-2-pro | Atlas Cloud | normal |
+| imagen-4-ultra | Atlas Cloud | normal |
+| ideogram-v3 | Atlas Cloud | normal |
+| z-image-turbo | Atlas Cloud | cheap |
+| seedream-5 | Atlas Cloud | normal |
+
+Atlas Cloud Key: `ATLASCLOUD_API_KEY` in `.env` (→ gehirn/CLAUDE.md für API-Details).
 
 ### Vault
 
@@ -199,3 +214,4 @@ Runbook: [auge-framework/docs/submission-pipeline.md](https://github.com/JereIsT
 - `[implementieren]` `buildRef` zurückschreiben (n8n-PR-URL in Submission-Vertex)
 - `[implementieren]` Casual-User-Seite (Themen einreichen ohne Admin-Zugang)
 - `[ausarbeiten]` auge-app: Electron-Shell aus hand extrahieren → ADR 0005
+
