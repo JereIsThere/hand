@@ -1,6 +1,7 @@
 name: Deploy hand
 
-on:
+# DEAKTIVIERT — deploy läuft jetzt via notify-framework.yml + auge-framework
+# on:
   push:
     branches: [main]
   workflow_dispatch:
@@ -11,7 +12,8 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-# DEAKTIVIERT — deploy läuft jetzt via notify-framework.yml + auge-framework
+# on: ubuntu-latest
     steps:
       - name: SSH -> Pull, install, restart
         uses: appleboy/ssh-action@v1.2.0
