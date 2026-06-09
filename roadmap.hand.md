@@ -1,4 +1,4 @@
-<!-- NOW: M2 -->
+<!-- NOW: M3 -->
 
 ## Backlog
 > Unpriorisierte Ideen ohne aktuellen Milestone.
@@ -30,6 +30,8 @@
 - [x] Kategorie-Toggle auge-framework / extern
 - [x] Collapse/Expand per Panel (localStorage)
 - [x] Milestone-Layout vertikal (Zeitstrahl, done/now/future States)
+- [x] Milestone Sort-Order: future → current → done
+- [x] Milestone Description aus > Zeile parsen + anzeigen
 
 ## M3: Tab-Umbau + Admin-Migration
 > Neue Tabs, Terminal-Placeholder, Admin-Tabs zu gehirn-admin migrieren.

@@ -585,7 +585,18 @@ tbody tr:hover { background: var(--surface-2); }
 .milestone-row.is-now    .milestone-icon { color: #00d4c8; }
 .milestone-row.is-future .milestone-icon { color: #a855f7; }
 .milestone-name  { flex: 1; }
-.milestone-count { font-size: 0.72rem; opacity: 0.6; }
+.milestone-count { font-size: 0.72rem; opacity: 0.6; flex-shrink: 0; }
+/* truncated description shown inline when milestone is collapsed */
+.milestone-desc-inline {
+  flex: 1; font-size: 0.72rem; opacity: 0.5;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 120px;
+}
+/* full description shown at top of expanded task list */
+.milestone-desc {
+  font-style: italic; font-size: 0.78rem; opacity: 0.55;
+  padding-bottom: 4px; line-height: 1.4;
+}
 
 .milestone-tasks { padding: 0 10px 8px 32px; display: flex; flex-direction: column; gap: 3px; }
 .milestone-tasks.hidden { display: none; }
