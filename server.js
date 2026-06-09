@@ -11,6 +11,7 @@ import { SETUP_KEYS } from './setup-config.js';
 import { setupVault } from './vault.js';
 import { setupShellLog } from './shell-log.js';
 import { setupSprecher } from './sprecher.js';
+import { setupRoadmaps } from './roadmaps.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const _require = createRequire(import.meta.url);
@@ -91,6 +92,7 @@ app.get('/api/version', (_req, res) => res.json({ version: APP_VERSION }));
 // sprecher ist FREUND-Level (requireAuth) — VOR dem Admin-Gate registrieren,
 // sonst würde das blanket requireAdmin unten die Routes abschatten.
 const sprecherModule  = setupSprecher(app,  { odb, dbName: ORIENTDB_DB, requireAuth: authz.requireAuth });
+setupRoadmaps(app, { odb, dbName: ORIENTDB_DB });
 
 // Ab hier: alle weiteren /api-Endpoints sind Admin-only.
 app.use('/api', authz.requireAdmin());

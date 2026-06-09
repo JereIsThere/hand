@@ -11,6 +11,7 @@ import { initFriends, activateFriends, deactivateFriends } from '../tools/friend
 import { initVaultUi, activateVaultUi, deactivateVaultUi } from '../tools/vault-ui.js';
 import { initSprecher, activateSprecher, deactivateSprecher } from '../tools/sprecher.js';
 import { initUeber, activateUeber, deactivateUeber } from '../tools/ueber.js';
+import { initRoadmaps, activateRoadmaps, deactivateRoadmaps } from '../tools/roadmaps.js';
 import { initUpdates } from '../tools/updates.js';
 import { initEmbeds, activateEmbed } from '../tools/embed.js';
 import { initAuth, isAdmin, me } from '../auth/gate.js';
@@ -19,7 +20,7 @@ import { checkAndShowSetupWizard, initSetupButton } from '../auth/setup.js';
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
 // ----------------------------------------------------------------
-const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'funkner', 'sprecher', 'ueber', 'willkommen'];
+const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'funkner', 'sprecher', 'roadmaps', 'ueber', 'willkommen'];
 
 function switchTool(name) {
   const fallback = isAdmin() ? 'orientdb' : 'willkommen';
@@ -44,6 +45,8 @@ function switchTool(name) {
   if (name === 'friends') activateFriends();
   else                    deactivateFriends();
   if (name === 'projects' || name === 'funkner') activateEmbed(name);
+  if (name === 'roadmaps') activateRoadmaps();
+  else                     deactivateRoadmaps();
 }
 
 // ----------------------------------------------------------------
@@ -251,6 +254,7 @@ async function bootstrap() {
     initVaultUi();
     initSprecher();
     initFriends();
+    initRoadmaps();
     initEmbeds();
 
     const initialTool = (location.hash || '#orientdb').slice(1);
