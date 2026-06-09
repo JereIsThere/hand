@@ -4,7 +4,6 @@
 > Unpriorisierte Ideen ohne aktuellen Milestone.
 
 - [ ] casual-User-Seite (Submissions einreichen ohne Admin)
-- [ ] auge-app Electron-Shell extrahieren (ADR 0005)
 
 ## M1: Core-Tabs
 > Grundtabs, Electron-Shell, Auth, Atlas Cloud Integration, Auto-Deploy.
@@ -34,11 +33,22 @@
 - [x] Milestone Description aus > Zeile parsen + anzeigen
 
 ## M3: Tab-Umbau + Admin-Migration
-> Neue Tabs, Terminal-Placeholder, Admin-Tabs zu gehirn-admin migrieren.
+> Neue Tabs (Zettel, Tafel, Screens, Funkner) + Admin-Tabs zu gehirn-admin migrieren.
 
-- [ ] Funkner-Tab: Claude-Code-inspiriertes Terminal-UI (Placeholder)
-- [ ] Screens-Tab (geplant, ADR 0013)
-- [ ] Tafel-Tab (geplant, ADR 0006)
+- [ ] Zettel-Tab — lineierter Schreibmodus (ADR 0006)
+- [ ] Tafel-Tab — SVG-Paint + PPTX-Style (ADR 0006)
+- [ ] Screens-Tab — Smart-Home-Display-Verwaltung + Quick-Capture (ADR 0013)
+- [ ] Funkner-Tab — Claude-Code-inspiriertes Terminal-UI, Placeholder (ADR 0002)
 - [ ] OrientDB-Admin → gehirn-admin (nach Fertigstellung)
 - [ ] SSH-Tunnel → gehirn-admin
 - [ ] Submissions → gehirn-admin
+
+## M4: auge-app Desktop Launcher
+> Electron-Shell aus hand/electron/ extrahieren, Launcher für alle Module (ADR 0011).
+
+- [ ] Electron-Wrapper aus hand/electron/ nach auge-framework/auge-app/ extrahieren
+- [ ] Launcher-Modus: Service-Status via GET /deploy/status, Start/Stop
+- [ ] App-Modi: hand (3737) · gehirn-admin (3738) · auge (3010) — per BrowserWindow-URL
+- [ ] Auth-Onboarding: GEHIRN_ADMIN_SECRET → OS-Keychain (safeStorage)
+- [ ] speicher-Tab: Galerie + Upload
+- [ ] Android: Capacitor wraps statisches Bundle (ADR 0005)
