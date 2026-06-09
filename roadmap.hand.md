@@ -35,6 +35,7 @@
 ## M3: Tab-Umbau + Admin-Migration
 > Neue Tabs (Zettel, Tafel, Screens, Funkner) + Admin-Tabs zu gehirn-admin migrieren.
 
+- [x] GEHIRN_API_KEY verkabelt (compose) + gehirnHeaders() in sprecher.js für Video/Proxy (ADR 0016)
 - [ ] Zettel-Tab — lineierter Schreibmodus (ADR 0006)
 - [ ] Tafel-Tab — SVG-Paint + PPTX-Style (ADR 0006)
 - [ ] Screens-Tab — Smart-Home-Display-Verwaltung + Quick-Capture (ADR 0013)
