@@ -3,6 +3,19 @@
 // Keys aus Vault/.env. (gehirn-Proxy kommt später wieder — Tools bringen ihre
 // API dann selbst mit.)
 
+// gehirn-Auth (ADR 0016): GEHIRN_API_KEY als Bearer-Token für zukünftige
+// gehirn-Proxy-Calls (Video, Wissenssystem). Warnen wenn nicht gesetzt —
+// kein Hard-Fail, da hand derzeit direkt gegen Provider arbeitet.
+if (!process.env.GEHIRN_API_KEY) {
+  console.warn('[sprecher] GEHIRN_API_KEY nicht gesetzt — gehirn-Proxy-Calls (Video, /wissen) werden fehlschlagen.');
+}
+
+// Baut den Authorization-Header für alle Calls Richtung GEHIRN_URL.
+export function gehirnHeaders() {
+  const key = process.env.GEHIRN_API_KEY;
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
 const sqlStr = (s) => `'${String(s == null ? '' : s).replace(/'/g, "''").slice(0, 8000)}'`;
 const safeId = (s) => String(s).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
 
