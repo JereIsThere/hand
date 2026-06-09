@@ -1,5 +1,157 @@
 // roadmaps.js — Roadmap-Cockpit Backend für Die Hand.
-// Projekte → Milestones → Tasks, alles in OrientDB.
+// Zwei Quellen: OrientDB (extern) + GitHub roadmap.REPO.md (auge-framework).
+
+// ── GitHub-backed Roadmaps ────────────────────────────────────────────────────
+
+const REPOS = [
+  { id: 'auge',    owner: 'JereIsThere', repo: 'auge',    file: 'roadmap.auge.md'    },
+  { id: 'hand',    owner: 'JereIsThere', repo: 'hand',    file: 'roadmap.hand.md'    },
+  { id: 'gehirn',  owner: 'JereIsThere', repo: 'gehirn',  file: 'roadmap.gehirn.md'  },
+  { id: 'funkner', owner: 'JereIsThere', repo: 'funkner', file: 'roadmap.funkner.md' },
+];
+
+const PROJECT_COLORS = {
+  auge: '#00d4c8', hand: '#d4a200', gehirn: '#a855f7', funkner: '#22c55e',
+};
+
+async function ghGet(path, token) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    headers: {
+      Authorization: token ? `Bearer ${token}` : '',
+      Accept: 'application/vnd.github.v3+json',
+    },
+  });
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${path}`);
+  return res.json();
+}
+
+async function ghPut(path, body, token) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `GitHub PUT ${res.status}`);
+  }
+  return res.json();
+}
+
+function parseRoadmap(md, repoId) {
+  const lines = md.split('\n');
+
+  // <!-- NOW: MX -->
+  const nowMatch = md.match(/<!--\s*NOW:\s*(M\w+)\s*-->/);
+  const nowSlug = nowMatch?.[1] || null;
+
+  const milestones = [];
+  const tasks = [];
+  let currentMs = null;
+  let msIndex = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // ## M1: Name  or  ## Backlog
+    const msMatch = line.match(/^##\s+(M\w+|Backlog)(?::\s*(.+))?$/);
+    if (msMatch) {
+      const msId = `${repoId}-${msMatch[1].toLowerCase()}`;
+      const name = msMatch[2]?.trim() || msMatch[1];
+      currentMs = { id: msId, repoId, slug: msMatch[1], name, order: msIndex++, isNow: msMatch[1] === nowSlug };
+      milestones.push(currentMs);
+      continue;
+    }
+
+    // - [x] or - [ ]
+    const taskMatch = line.match(/^- \[([ x])\] (.+)$/);
+    if (taskMatch && currentMs) {
+      tasks.push({
+        id: `${repoId}-task-${tasks.length}`,
+        repoId,
+        milestoneId: currentMs.id,
+        milestoneSlug: currentMs.slug,
+        index: tasks.filter(t => t.repoId === repoId).length, // global index in this file
+        title: taskMatch[2].trim(),
+        status: taskMatch[1] === 'x' ? 'done' : 'open',
+      });
+    }
+  }
+
+  return { milestones, tasks, nowSlug };
+}
+
+async function fetchGithubRoadmaps(token) {
+  const results = await Promise.allSettled(
+    REPOS.map(async ({ id, owner, repo, file }) => {
+      const data = await ghGet(`/repos/${owner}/${repo}/contents/${file}`, token);
+      const md = Buffer.from(data.content, 'base64').toString('utf8');
+      const { milestones, tasks, nowSlug } = parseRoadmap(md, id);
+      return {
+        project: {
+          id, slug: id, name: id, category: 'auge-framework',
+          color: PROJECT_COLORS[id] || '#00d4c8',
+          currentMilestone: milestones.find(m => m.isNow)?.id || null,
+          sha: data.sha,
+          rawUrl: data.download_url,
+        },
+        milestones,
+        tasks,
+      };
+    })
+  );
+
+  const projects = [], milestones = [], tasks = [];
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      projects.push(r.value.project);
+      milestones.push(...r.value.milestones);
+      tasks.push(...r.value.tasks);
+    }
+  }
+  return { projects, milestones, tasks };
+}
+
+async function toggleTask(repoId, taskIndex, token) {
+  const { owner, repo, file } = REPOS.find(r => r.id === repoId) || {};
+  if (!owner) throw new Error(`Unknown repo: ${repoId}`);
+
+  // Fetch current file
+  const data = await ghGet(`/repos/${owner}/${repo}/contents/${file}`, token);
+  const md = Buffer.from(data.content, 'base64').toString('utf8');
+  const lines = md.split('\n');
+
+  // Find the nth task line (counting only task lines)
+  let count = -1;
+  let targetLine = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^- \[([ x])\] /.test(lines[i])) {
+      count++;
+      if (count === taskIndex) { targetLine = i; break; }
+    }
+  }
+  if (targetLine === -1) throw new Error(`Task index ${taskIndex} not found`);
+
+  // Toggle
+  const was = lines[targetLine].includes('- [x]');
+  lines[targetLine] = lines[targetLine].replace(
+    was ? '- [x] ' : '- [ ] ',
+    was ? '- [ ] ' : '- [x] '
+  );
+
+  const newContent = Buffer.from(lines.join('\n')).toString('base64');
+  await ghPut(`/repos/${owner}/${repo}/contents/${file}`, {
+    message: 'roadmap: update via hand',
+    content: newContent,
+    sha: data.sha,
+  }, token);
+}
+
+// ── OrientDB helpers ──────────────────────────────────────────────────────────
 
 const sqlStr = (s) => `'${String(s == null ? '' : s).replace(/'/g, "''").slice(0, 8000)}'`;
 const safeId = (s) => String(s).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
@@ -153,6 +305,23 @@ export function setupRoadmaps(app, { odb, dbName }) {
     try {
       const id = safeId(req.params.id);
       await sql(`DELETE VERTEX RoadmapTask WHERE @rid=${id}`);
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── GitHub-backed Routes ──────────────────────────────────────────────
+
+  app.get('/api/roadmaps/github', async (_req, res) => {
+    try {
+      const token = process.env.GITHUB_TOKEN;
+      res.json(await fetchGithubRoadmaps(token));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.patch('/api/roadmaps/github/:repoId/tasks/:taskIndex', async (req, res) => {
+    try {
+      const token = process.env.GITHUB_TOKEN;
+      await toggleTask(req.params.repoId, parseInt(req.params.taskIndex, 10), token);
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });

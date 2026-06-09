@@ -1,25 +1,58 @@
-// public/tools/roadmaps.js — Roadmap-Cockpit Frontend (ES module)
+// public/tools/roadmaps.js — GitHub-backed Roadmap View (ES module)
+// Reads roadmap.REPO.md files from GitHub via /api/roadmaps/github.
+// Category toggle: [● auge-framework] pill (extern stubbed, no data yet).
+// Collapse state persisted per-project via localStorage.
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let state = { projects: [], milestones: [], tasks: [] };
+let ghData = { projects: [], milestones: [], tasks: [] };
 let hiddenCats = new Set();
-let dragTask = null;
 let initialized = false;
+let loading = false;
 
-// ── API helpers ───────────────────────────────────────────────────────────────
-const api = (path, method = 'GET', body) =>
-  fetch(path, {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const escHtml = (s) =>
+  String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+const collapseKey = (id) => `roadmaps-collapsed-${id}`;
+const isCollapsed  = (id) => localStorage.getItem(collapseKey(id)) === '1';
+const setCollapsed = (id, val) => {
+  if (val) localStorage.setItem(collapseKey(id), '1');
+  else     localStorage.removeItem(collapseKey(id));
+};
+
+async function api(path, method = 'GET', body) {
+  const r = await fetch(path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
-  }).then((r) => r.json());
+  });
+  if (!r.ok) throw new Error(`${method} ${path} → ${r.status}`);
+  return r.json();
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function loadGithubRoadmaps() {
+  const root = document.getElementById('tool-roadmaps');
+  if (!root) return;
+  loading = true;
+  root.innerHTML = '<div class="tool-body" style="color:var(--ink-soft);padding:24px">Lade…</div>';
+  try {
+    ghData = await api('/api/roadmaps/github');
+    render();
+  } catch (e) {
+    root.innerHTML = `<div class="tool-body" style="color:var(--red);padding:24px">Fehler: ${escHtml(e.message)}</div>`;
+  } finally {
+    loading = false;
+  }
+}
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
   const root = document.getElementById('tool-roadmaps');
   if (!root) return;
 
-  const cats = [...new Set(state.projects.map((p) => p.category || 'extern'))];
+  // Determine categories present
+  const cats = [...new Set(ghData.projects.map((p) => p.category || 'extern'))];
 
   root.innerHTML = `
     <div class="roadmaps-topbar">
@@ -29,22 +62,16 @@ function render() {
             <span>${hiddenCats.has(c) ? '○' : '●'}</span> ${c}
           </button>`).join('')}
       </div>
-      <button class="btn btn-sm" id="rm-add-project-btn">+ Roadmap</button>
-    </div>
-    <div id="rm-add-project-form" class="rm-inline-form" style="display:none">
-      <input id="rm-proj-name" class="inp" placeholder="Projektname" />
-      <select id="rm-proj-cat" class="inp">
-        <option value="auge-framework">auge-framework</option>
-        <option value="extern" selected>extern</option>
-      </select>
-      <button class="btn btn-sm" id="rm-proj-save">Anlegen</button>
-      <button class="btn btn-sm" id="rm-proj-cancel">✕</button>
+      <button class="btn btn-sm" id="rm-reload-btn" title="Neu laden">↺ Reload</button>
     </div>
     <div class="roadmaps-wrap" id="rm-wrap">
-      ${state.projects
+      ${ghData.projects
         .filter((p) => !hiddenCats.has(p.category || 'extern'))
         .map((p) => renderProject(p))
         .join('')}
+      ${ghData.projects.length === 0
+        ? '<div style="color:var(--ink-soft);padding:24px">Keine Roadmap-Daten gefunden.</div>'
+        : ''}
     </div>
   `;
 
@@ -52,86 +79,78 @@ function render() {
 }
 
 function renderProject(p) {
-  const milestones = state.milestones.filter((m) => m.project === p.slug);
+  const milestones = ghData.milestones.filter((m) => m.repoId === p.id);
   const color = p.color || '#00d4c8';
+  const collapsed = isCollapsed(p.id);
 
-  if (p.collapsed) {
+  if (collapsed) {
     return `
-      <div class="roadmap-panel collapsed" data-proj="${p.slug}" style="border-top:3px solid ${color}">
-        <div class="roadmap-collapsed-title">${p.name}</div>
+      <div class="roadmap-panel collapsed gh-project" data-proj="${p.id}"
+        style="border-top:3px solid ${color};cursor:pointer"
+        title="Aufklappen">
+        <div class="roadmap-collapsed-title" style="color:${color}">${escHtml(p.name)}</div>
       </div>`;
   }
 
   return `
-    <div class="roadmap-panel" data-proj="${p.slug}" style="border-top:3px solid ${color}">
+    <div class="roadmap-panel gh-project" data-proj="${p.id}" style="border-top:3px solid ${color}">
       <div class="roadmap-header">
-        <span class="roadmap-name">${p.name}</span>
-        <button class="btn btn-xs rm-collapse" data-proj="${p.slug}">◀</button>
-        <button class="btn btn-xs rm-show-ms-form" data-proj="${p.slug}">+ M</button>
+        <span class="roadmap-name" style="color:${color}">${escHtml(p.name)}</span>
+        <button class="btn btn-xs rm-collapse" data-proj="${p.id}" title="Einklappen">◀</button>
+        <a class="btn btn-xs" href="https://github.com/JereIsThere/${p.id}" target="_blank" rel="noopener"
+          style="text-decoration:none;opacity:.7" title="GitHub">↗</a>
       </div>
       <div class="roadmap-body">
         <div class="milestone-row">
           ${milestones.map((m) => renderMilestone(m, p)).join('')}
-          <div class="milestone-add-col">
-            <div class="rm-ms-form" data-proj="${p.slug}" style="display:none">
-              <input class="inp inp-sm rm-ms-name" placeholder="Milestone…" />
-              <button class="btn btn-xs rm-ms-save" data-proj="${p.slug}">OK</button>
-            </div>
-          </div>
         </div>
       </div>
     </div>`;
 }
 
 function renderMilestone(m, p) {
-  const tasks = state.tasks.filter((t) => t.milestone === m.slug);
-  const isNow = p.currentMilestone === m.slug;
+  const tasks = ghData.tasks.filter((t) => t.milestoneId === m.id);
+  const isNow = m.isNow;
+  const done  = tasks.filter((t) => t.status === 'done').length;
+  const total = tasks.length;
+
   return `
-    <div class="milestone-col drop-zone ${isNow ? 'is-now' : ''}" data-ms="${m.slug}">
+    <div class="milestone-col ${isNow ? 'is-now' : ''}" data-ms="${escHtml(m.id)}">
       <div class="milestone-header">
-        <span class="ms-name" contenteditable="true" data-ms="${m.slug}">${m.name}</span>
-        <button class="btn btn-xs rm-set-now ${isNow ? 'is-now-btn' : ''}"
-          data-proj="${p.slug}" data-ms="${m.slug}">◀NOW</button>
-        <button class="btn btn-xs rm-del-ms" data-ms="${m.slug}">✕</button>
+        <span class="ms-name">${escHtml(m.name)}</span>
+        ${isNow ? '<span class="now-badge" style="font-size:10px;padding:1px 6px">NOW</span>' : ''}
+        ${total > 0 ? `<span style="font-size:10px;color:var(--ink-soft);margin-left:auto">${done}/${total}</span>` : ''}
       </div>
-      ${isNow ? '<div class="now-badge">NOW</div>' : ''}
-      <div class="task-list" data-ms="${m.slug}">
-        ${tasks.map((t) => renderTask(t)).join('')}
-      </div>
-      <div class="rm-task-footer">
-        <button class="btn btn-xs rm-show-task-form" data-ms="${m.slug}">+ Task</button>
-        <div class="rm-task-form" data-ms="${m.slug}" style="display:none">
-          <input class="inp inp-sm rm-task-input" placeholder="Task…" />
-          <button class="btn btn-xs rm-task-save" data-ms="${m.slug}">OK</button>
-        </div>
+      <div class="task-list">
+        ${tasks.map((t) => renderGhTask(t, p.id)).join('')}
       </div>
     </div>`;
 }
 
-function renderTask(t) {
+function renderGhTask(t, repoId) {
   const done = t.status === 'done';
   return `
-    <div class="task-card ${done ? 'done' : ''}" draggable="true"
-      data-task="${t.id}" data-ms="${t.milestone}">
-      <span class="task-drag">⠿</span>
-      <span class="task-title" contenteditable="true" data-task="${t.id}">${escHtml(t.title)}</span>
-      <button class="btn btn-xs task-toggle" data-task="${t.id}"
-        data-next="${done ? 'open' : 'done'}">${done ? '↩' : '✓'}</button>
-      <button class="btn btn-xs task-del" data-task="${t.id}">✕</button>
+    <div class="task-card ${done ? 'done' : ''}" data-task-index="${t.index}" data-repo="${escHtml(repoId)}">
+      <label style="display:flex;align-items:flex-start;gap:6px;cursor:pointer;width:100%">
+        <input type="checkbox" class="gh-task-check" data-index="${t.index}" data-repo="${escHtml(repoId)}"
+          ${done ? 'checked' : ''} style="margin-top:2px;cursor:pointer;accent-color:var(--teal)" />
+        <span class="task-title ${done ? 'task-done-title' : ''}">${escHtml(t.title)}</span>
+      </label>
     </div>`;
 }
 
-function escHtml(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// ── Bind all events ───────────────────────────────────────────────────────────
+// ── Event binding ─────────────────────────────────────────────────────────────
 function bindAll() {
-  const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => document.querySelectorAll(sel);
+  const root = document.getElementById('tool-roadmaps');
+  if (!root) return;
+
+  // Reload
+  root.querySelector('#rm-reload-btn')?.addEventListener('click', () => {
+    if (!loading) loadGithubRoadmaps();
+  });
 
   // Category toggles
-  $$('.cat-toggle').forEach((btn) => {
+  root.querySelectorAll('.cat-toggle').forEach((btn) => {
     btn.addEventListener('click', () => {
       const cat = btn.dataset.cat;
       hiddenCats.has(cat) ? hiddenCats.delete(cat) : hiddenCats.add(cat);
@@ -139,180 +158,50 @@ function bindAll() {
     });
   });
 
-  // Add project form
-  $('#rm-add-project-btn')?.addEventListener('click', () => {
-    const f = $('#rm-add-project-form');
-    f.style.display = f.style.display === 'none' ? 'flex' : 'none';
-  });
-  $('#rm-proj-cancel')?.addEventListener('click', () => {
-    $('#rm-add-project-form').style.display = 'none';
-  });
-  $('#rm-proj-save')?.addEventListener('click', async () => {
-    const name = $('#rm-proj-name').value.trim();
-    const category = $('#rm-proj-cat').value;
-    if (!name) return;
-    const proj = await api('/api/roadmaps/projects', 'POST', {
-      name, category, order: state.projects.length,
-    });
-    state.projects.push(proj);
-    $('#rm-add-project-form').style.display = 'none';
-    render();
-  });
-
-  // Collapse
-  $$('.rm-collapse').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
+  // Collapse — header button
+  root.querySelectorAll('.rm-collapse').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const proj = state.projects.find((p) => p.slug === btn.dataset.proj);
-      if (!proj) return;
-      proj.collapsed = true;
-      await api(`/api/roadmaps/projects/${proj.id}`, 'PATCH', { collapsed: true });
-      render();
-    });
-  });
-  $$('.roadmap-panel.collapsed').forEach((panel) => {
-    panel.addEventListener('click', async () => {
-      const proj = state.projects.find((p) => p.slug === panel.dataset.proj);
-      if (!proj) return;
-      proj.collapsed = false;
-      await api(`/api/roadmaps/projects/${proj.id}`, 'PATCH', { collapsed: false });
+      setCollapsed(btn.dataset.proj, true);
       render();
     });
   });
 
-  // Show milestone form
-  $$('.rm-show-ms-form').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const form = $(`.rm-ms-form[data-proj="${btn.dataset.proj}"]`);
-      if (form) form.style.display = form.style.display === 'none' ? 'flex' : 'none';
-    });
-  });
-  $$('.rm-ms-save').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const projSlug = btn.dataset.proj;
-      const form = btn.closest('.rm-ms-form');
-      const name = form.querySelector('.rm-ms-name').value.trim();
-      if (!name) return;
-      const order = state.milestones.filter((m) => m.project === projSlug).length;
-      const ms = await api('/api/roadmaps/milestones', 'POST', { project: projSlug, name, order });
-      state.milestones.push(ms);
+  // Expand — click on collapsed panel
+  root.querySelectorAll('.roadmap-panel.collapsed').forEach((panel) => {
+    panel.addEventListener('click', () => {
+      setCollapsed(panel.dataset.proj, false);
       render();
     });
   });
 
-  // Delete milestone
-  $$('.rm-del-ms').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const ms = state.milestones.find((m) => m.slug === btn.dataset.ms);
-      if (!ms || !confirm(`Milestone "${ms.name}" löschen?`)) return;
-      await api(`/api/roadmaps/milestones/${ms.id}`, 'DELETE');
-      state.milestones = state.milestones.filter((m) => m.slug !== ms.slug);
-      state.tasks = state.tasks.filter((t) => t.milestone !== ms.slug);
-      render();
-    });
-  });
+  // Task checkbox toggle
+  root.querySelectorAll('.gh-task-check').forEach((cb) => {
+    cb.addEventListener('change', async () => {
+      const repoId    = cb.dataset.repo;
+      const taskIndex = parseInt(cb.dataset.index, 10);
 
-  // Set NOW
-  $$('.rm-set-now').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const proj = state.projects.find((p) => p.slug === btn.dataset.proj);
-      if (!proj) return;
-      const newNow = proj.currentMilestone === btn.dataset.ms ? '' : btn.dataset.ms;
-      proj.currentMilestone = newNow;
-      await api(`/api/roadmaps/projects/${proj.id}`, 'PATCH', { currentMilestone: newNow });
-      render();
-    });
-  });
+      // Optimistic update
+      const task = ghData.tasks.find((t) => t.repoId === repoId && t.index === taskIndex);
+      if (task) {
+        task.status = cb.checked ? 'done' : 'open';
+        render();
+      }
 
-  // Milestone name inline edit
-  $$('.ms-name[contenteditable]').forEach((span) => {
-    span.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); span.blur(); } });
-    span.addEventListener('blur', async () => {
-      const ms = state.milestones.find((m) => m.slug === span.dataset.ms);
-      if (!ms) return;
-      const name = span.textContent.trim();
-      if (name === ms.name) return;
-      ms.name = name;
-      await api(`/api/roadmaps/milestones/${ms.id}`, 'PATCH', { name });
-    });
-  });
-
-  // Show task form
-  $$('.rm-show-task-form').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const form = btn.nextElementSibling;
-      form.style.display = form.style.display === 'none' ? 'flex' : 'none';
-      form.querySelector('.rm-task-input')?.focus();
-    });
-  });
-  $$('.rm-task-save').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const msSlug = btn.dataset.ms;
-      const input = btn.previousElementSibling;
-      const title = input.value.trim();
-      if (!title) return;
-      const task = await api('/api/roadmaps/tasks', 'POST', { milestone: msSlug, title });
-      state.tasks.unshift(task);
-      input.value = '';
-      render();
-    });
-  });
-
-  // Task done toggle
-  $$('.task-toggle').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const task = state.tasks.find((t) => t.id === btn.dataset.task);
-      if (!task) return;
-      task.status = btn.dataset.next;
-      await api(`/api/roadmaps/tasks/${task.id}`, 'PATCH', { status: task.status });
-      render();
-    });
-  });
-
-  // Task delete
-  $$('.task-del').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      await api(`/api/roadmaps/tasks/${btn.dataset.task}`, 'DELETE');
-      state.tasks = state.tasks.filter((t) => t.id !== btn.dataset.task);
-      render();
-    });
-  });
-
-  // Task inline edit
-  $$('.task-title[contenteditable]').forEach((span) => {
-    span.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); span.blur(); } });
-    span.addEventListener('blur', async () => {
-      const task = state.tasks.find((t) => t.id === span.dataset.task);
-      if (!task) return;
-      const title = span.textContent.trim();
-      if (title === task.title) return;
-      task.title = title;
-      await api(`/api/roadmaps/tasks/${task.id}`, 'PATCH', { title });
-    });
-  });
-
-  // Drag & drop
-  $$('.task-card[draggable]').forEach((card) => {
-    card.addEventListener('dragstart', (e) => {
-      dragTask = { id: card.dataset.task, sourceMilestone: card.dataset.ms };
-      e.dataTransfer.effectAllowed = 'move';
-      setTimeout(() => card.classList.add('dragging'), 0);
-    });
-    card.addEventListener('dragend', () => card.classList.remove('dragging'));
-  });
-  $$('.drop-zone').forEach((zone) => {
-    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-    zone.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      zone.classList.remove('dragover');
-      if (!dragTask || !zone.dataset.ms || zone.dataset.ms === dragTask.sourceMilestone) return;
-      const task = state.tasks.find((t) => t.id === dragTask.id);
-      if (!task) return;
-      task.milestone = zone.dataset.ms;
-      await api(`/api/roadmaps/tasks/${task.id}`, 'PATCH', { milestone: zone.dataset.ms });
-      dragTask = null;
-      render();
+      try {
+        await api(`/api/roadmaps/github/${repoId}/tasks/${taskIndex}`, 'PATCH');
+      } catch (e) {
+        // Revert
+        if (task) {
+          task.status = cb.checked ? 'open' : 'done';
+          render();
+        }
+        const msg = document.createElement('div');
+        msg.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#f03;color:#fff;padding:10px 16px;border-radius:8px;z-index:9999;font-size:13px';
+        msg.textContent = `Fehler: ${e.message}`;
+        document.body.append(msg);
+        setTimeout(() => msg.remove(), 4000);
+      }
     });
   });
 }
@@ -321,19 +210,14 @@ function bindAll() {
 export async function initRoadmaps() {
   if (initialized) return;
   initialized = true;
-  const root = document.getElementById('tool-roadmaps');
-  if (!root) return;
-  root.innerHTML = '<div class="tool-body" style="color:var(--ink-soft)">Lade…</div>';
-  try {
-    state = await api('/api/roadmaps');
-    render();
-  } catch (e) {
-    root.innerHTML = `<div class="tool-body" style="color:var(--red)">Fehler: ${e.message}</div>`;
-  }
+  // pre-warm: show skeletons until data loads
+  await loadGithubRoadmaps();
 }
 
 export function activateRoadmaps() {
-  if (!initialized) initRoadmaps();
+  if (!initialized) { initRoadmaps(); return; }
+  // Refresh on each activation to pick up any repo changes
+  if (!loading) loadGithubRoadmaps();
 }
 
 export function deactivateRoadmaps() {}
