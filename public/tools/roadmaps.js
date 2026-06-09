@@ -1,9 +1,8 @@
 // public/tools/roadmaps.js — GitHub-backed Roadmap View (ES module)
-// Reads roadmap.REPO.md files from GitHub via /api/roadmaps/github.
-// Milestones rendered as a vertical timeline stack within each project panel.
+// Milestones: future (reversed) → current → done, vertically stacked.
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let ghData = { projects: [], milestones: [], tasks: [] };
+let ghData = { projects: [], milestones: [], tasks: [], errors: [] };
 let hiddenCats = new Set();
 let initialized = false;
 let loading = false;
@@ -12,20 +11,19 @@ let loading = false;
 const escHtml = (s) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-// localStorage keys
-const msCKey  = (repoId, msIdx) => `rm-ms-${repoId}-${msIdx}`;
-const isMsCollapsed = (repoId, msIdx) => localStorage.getItem(msCKey(repoId, msIdx)) === '1';
-const setMsCollapsed = (repoId, msIdx, val) => {
-  if (val) localStorage.setItem(msCKey(repoId, msIdx), '1');
-  else     localStorage.removeItem(msCKey(repoId, msIdx));
-};
+const truncate = (s, n) => s && s.length > n ? s.slice(0, n - 1) + '…' : s;
 
-const projCKey    = (id) => `roadmaps-collapsed-${id}`;
-const isProjColl  = (id) => localStorage.getItem(projCKey(id)) === '1';
-const setProjColl = (id, val) => {
-  if (val) localStorage.setItem(projCKey(id), '1');
-  else     localStorage.removeItem(projCKey(id));
-};
+const msCKey     = (repoId, msId) => `rm-ms-${repoId}-${msId}`;
+const isMsColl   = (repoId, msId) => localStorage.getItem(msCKey(repoId, msId)) === '1';
+const setMsColl  = (repoId, msId, v) => v
+  ? localStorage.setItem(msCKey(repoId, msId), '1')
+  : localStorage.removeItem(msCKey(repoId, msId));
+
+const projCKey   = (id) => `roadmaps-collapsed-${id}`;
+const isProjColl = (id) => localStorage.getItem(projCKey(id)) === '1';
+const setProjColl= (id, v) => v
+  ? localStorage.setItem(projCKey(id), '1')
+  : localStorage.removeItem(projCKey(id));
 
 async function api(path, method = 'GET', body) {
   const r = await fetch(path, {
@@ -60,6 +58,12 @@ function render() {
 
   const cats = [...new Set(ghData.projects.map((p) => p.category || 'extern'))];
 
+  const errBanner = ghData.errors?.length
+    ? `<div style="padding:6px 12px;background:rgba(255,80,0,.12);color:#ff8060;font-size:0.78rem;border-radius:6px;margin-bottom:4px">
+        Nicht geladen: ${ghData.errors.map(e => `${e.repo} (${e.error})`).join(' · ')}
+       </div>`
+    : '';
+
   root.innerHTML = `
     <div class="roadmaps-topbar">
       <div class="cat-toggles">
@@ -70,6 +74,7 @@ function render() {
       </div>
       <button class="btn btn-sm" id="rm-reload-btn" title="Neu laden">↺ Reload</button>
     </div>
+    ${errBanner}
     <div class="roadmaps-wrap" id="rm-wrap">
       ${ghData.projects
         .filter((p) => !hiddenCats.has(p.category || 'extern'))
@@ -87,9 +92,8 @@ function render() {
 function renderProject(p) {
   const milestones = ghData.milestones.filter((m) => m.repoId === p.id);
   const color = p.color || '#00d4c8';
-  const collapsed = isProjColl(p.id);
 
-  if (collapsed) {
+  if (isProjColl(p.id)) {
     return `
       <div class="roadmap-panel collapsed gh-project" data-proj="${p.id}"
         style="border-top:3px solid ${color};cursor:pointer" title="Aufklappen">
@@ -107,42 +111,44 @@ function renderProject(p) {
       </div>
       <div class="roadmap-body">
         <div class="milestones-stack">
-          ${milestones.map((m, idx) => renderMilestone(m, p, idx)).join('')}
+          ${milestones.map((m) => renderMilestone(m, p)).join('')}
         </div>
       </div>
     </div>`;
 }
 
-function renderMilestone(m, p, msIdx) {
+function renderMilestone(m, p) {
   const tasks = ghData.tasks.filter((t) => t.milestoneId === m.id);
   const doneCount  = tasks.filter((t) => t.status === 'done').length;
   const totalCount = tasks.length;
   const allDone    = totalCount > 0 && doneCount === totalCount;
   const isNow      = m.isNow;
 
-  // Determine state
-  let state, icon, stateClass;
-  if (allDone) {
-    state = 'done';    icon = '✓'; stateClass = 'is-done';
-  } else if (isNow) {
-    state = 'now';     icon = '◀'; stateClass = 'is-now';
-  } else {
-    state = 'future';  icon = '○'; stateClass = 'is-future';
-  }
+  let stateClass, icon;
+  if (allDone)  { stateClass = 'is-done';   icon = '✓'; }
+  else if (isNow) { stateClass = 'is-now';  icon = '◀'; }
+  else          { stateClass = 'is-future'; icon = '○'; }
 
-  // Collapse logic: NOW is always expanded; others default collapsed
-  const collapsed = isNow ? false : isMsCollapsed(p.id, msIdx);
+  const collapsed = isNow ? false : isMsColl(p.id, m.id);
+  const desc = m.description || '';
+
+  const countBadge = totalCount > 0
+    ? `<span class="milestone-count">${doneCount}/${totalCount}</span>`
+    : '';
+
+  const collapsedDesc = !collapsed && !isNow ? '' :
+    (desc ? `<span class="milestone-desc-inline">${escHtml(truncate(desc, 60))}</span>` : '');
 
   return `
-    <div class="milestone-row ${stateClass}" data-ms-proj="${escHtml(p.id)}" data-ms-idx="${msIdx}" data-ms-state="${state}">
+    <div class="milestone-row ${stateClass}" data-ms-id="${escHtml(m.id)}" data-ms-now="${isNow}">
       <div class="milestone-header">
         <span class="milestone-icon">${icon}</span>
         <span class="milestone-name">${escHtml(m.name)}</span>
-        ${totalCount > 0
-          ? `<span class="milestone-count">${doneCount}/${totalCount}</span>`
-          : ''}
+        ${collapsed && desc ? `<span class="milestone-desc-inline">${escHtml(truncate(desc, 60))}</span>` : ''}
+        ${countBadge}
       </div>
       <div class="milestone-tasks${collapsed ? ' hidden' : ''}">
+        ${desc ? `<div class="milestone-desc">${escHtml(desc)}</div>` : ''}
         ${tasks.map((t) => renderTask(t, p.id)).join('')}
         ${tasks.length === 0 ? '<span style="color:var(--ink-soft);font-size:0.78rem">Keine Tasks</span>' : ''}
       </div>
@@ -165,12 +171,10 @@ function bindAll() {
   const root = document.getElementById('tool-roadmaps');
   if (!root) return;
 
-  // Reload
   root.querySelector('#rm-reload-btn')?.addEventListener('click', () => {
     if (!loading) loadGithubRoadmaps();
   });
 
-  // Category toggles
   root.querySelectorAll('.cat-toggle').forEach((btn) => {
     btn.addEventListener('click', () => {
       const cat = btn.dataset.cat;
@@ -179,7 +183,6 @@ function bindAll() {
     });
   });
 
-  // Project: collapse button
   root.querySelectorAll('.rm-collapse').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -188,7 +191,6 @@ function bindAll() {
     });
   });
 
-  // Project: expand collapsed panel
   root.querySelectorAll('.roadmap-panel.collapsed').forEach((panel) => {
     panel.addEventListener('click', () => {
       setProjColl(panel.dataset.proj, false);
@@ -196,19 +198,19 @@ function bindAll() {
     });
   });
 
-  // Milestone header: click → toggle tasks (unless NOW)
+  // Milestone header click → toggle collapse (NOW is always expanded)
   root.querySelectorAll('.milestone-row').forEach((row) => {
+    if (row.dataset.msNow === 'true') return;
     const header = row.querySelector('.milestone-header');
     if (!header) return;
     header.addEventListener('click', () => {
-      if (row.dataset.msState === 'now') return; // NOW always stays expanded
+      const msId  = row.dataset.msId;
+      const proj  = row.closest('.gh-project')?.dataset.proj;
       const tasks = row.querySelector('.milestone-tasks');
-      if (!tasks) return;
-      const repoId = row.closest('.gh-project')?.dataset.proj;
-      const msIdx  = parseInt(row.dataset.msIdx, 10);
-      const nowHidden = tasks.classList.contains('hidden');
-      tasks.classList.toggle('hidden', !nowHidden);
-      setMsCollapsed(repoId, msIdx, !nowHidden);
+      if (!tasks || !proj) return;
+      const nowCollapsed = tasks.classList.contains('hidden');
+      tasks.classList.toggle('hidden', !nowCollapsed);
+      setMsColl(proj, msId, !nowCollapsed);
     });
   });
 
@@ -218,21 +220,13 @@ function bindAll() {
       const repoId    = cb.dataset.repo;
       const taskIndex = parseInt(cb.dataset.index, 10);
 
-      // Optimistic update
       const task = ghData.tasks.find((t) => t.repoId === repoId && t.index === taskIndex);
-      if (task) {
-        task.status = cb.checked ? 'done' : 'open';
-        render();
-      }
+      if (task) { task.status = cb.checked ? 'done' : 'open'; render(); }
 
       try {
         await api(`/api/roadmaps/github/${repoId}/tasks/${taskIndex}`, 'PATCH');
       } catch (e) {
-        // Revert
-        if (task) {
-          task.status = cb.checked ? 'open' : 'done';
-          render();
-        }
+        if (task) { task.status = cb.checked ? 'open' : 'done'; render(); }
         const msg = document.createElement('div');
         msg.style.cssText =
           'position:fixed;bottom:20px;right:20px;background:#f03;color:#fff;' +
@@ -245,7 +239,7 @@ function bindAll() {
   });
 }
 
-// ── Lifecycle exports (main.js pattern) ──────────────────────────────────────
+// ── Lifecycle exports ─────────────────────────────────────────────────────────
 export async function initRoadmaps() {
   if (initialized) return;
   initialized = true;

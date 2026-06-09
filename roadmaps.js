@@ -59,8 +59,15 @@ function parseRoadmap(md, repoId) {
     if (msMatch) {
       const msId = `${repoId}-${msMatch[1].toLowerCase()}`;
       const name = msMatch[2]?.trim() || msMatch[1];
-      currentMs = { id: msId, repoId, slug: msMatch[1], name, order: msIndex++, isNow: msMatch[1] === nowSlug };
+      currentMs = { id: msId, repoId, slug: msMatch[1], name, description: null, order: msIndex++, isNow: msMatch[1] === nowSlug };
       milestones.push(currentMs);
+      continue;
+    }
+
+    // > description line directly after ## header
+    const descMatch = line.match(/^>\s*(.+)$/);
+    if (descMatch && currentMs && currentMs.description === null) {
+      currentMs.description = descMatch[1].trim();
       continue;
     }
 
@@ -72,7 +79,7 @@ function parseRoadmap(md, repoId) {
         repoId,
         milestoneId: currentMs.id,
         milestoneSlug: currentMs.slug,
-        index: tasks.filter(t => t.repoId === repoId).length, // global index in this file
+        index: tasks.filter(t => t.repoId === repoId).length,
         title: taskMatch[2].trim(),
         status: taskMatch[1] === 'x' ? 'done' : 'open',
       });
@@ -87,16 +94,30 @@ async function fetchGithubRoadmaps(token) {
     REPOS.map(async ({ id, owner, repo, file }) => {
       const data = await ghGet(`/repos/${owner}/${repo}/contents/${file}`, token);
       const md = Buffer.from(data.content, 'base64').toString('utf8');
-      const { milestones, tasks, nowSlug } = parseRoadmap(md, id);
+      const { milestones, tasks } = parseRoadmap(md, id);
+
+      // Classify milestones
+      const msTaskMap = {};
+      for (const m of milestones) msTaskMap[m.id] = [];
+      for (const t of tasks) msTaskMap[t.milestoneId]?.push(t);
+
+      const future  = milestones.filter(m => !m.isNow && msTaskMap[m.id].some(t => t.status === 'open'));
+      const current = milestones.filter(m => m.isNow);
+      const done    = milestones.filter(m => !m.isNow && msTaskMap[m.id].length > 0 && msTaskMap[m.id].every(t => t.status === 'done'));
+      // Milestones with no tasks: treat as future
+      const noTasks = milestones.filter(m => !m.isNow && msTaskMap[m.id].length === 0);
+
+      const sorted = [...[...future, ...noTasks].reverse(), ...current, ...done];
+
       return {
         project: {
           id, slug: id, name: id, category: 'auge-framework',
           color: PROJECT_COLORS[id] || '#00d4c8',
-          currentMilestone: milestones.find(m => m.isNow)?.id || null,
+          currentMilestone: current[0]?.id || null,
           sha: data.sha,
           rawUrl: data.download_url,
         },
-        milestones,
+        milestones: sorted,
         tasks,
       };
     })
