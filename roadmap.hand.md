@@ -18,9 +18,9 @@
 
 - [x] OrientDB-Backend (Projects/Milestones/Tasks CRUD)
 - [x] Sidebar-Button + Section
-- [ ] GitHub-backed View (roadmap.REPO.md lesen + Toggle)
-- [ ] Kategorie-Toggle auge-framework / extern
-- [ ] Collapse/Expand per Panel (localStorage)
+- [x] GitHub-backed View (roadmap.REPO.md lesen + Toggle)
+- [x] Kategorie-Toggle auge-framework / extern
+- [x] Collapse/Expand per Panel (localStorage)
 
 ## M3: Tab-Umbau + Admin-Migration
 
