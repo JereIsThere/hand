@@ -15,12 +15,9 @@ const PROJECT_COLORS = {
 };
 
 async function ghGet(path, token) {
-  const res = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-      Accept: 'application/vnd.github.v3+json',
-    },
-  });
+  const headers = { Accept: 'application/vnd.github.v3+json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`https://api.github.com${path}`, { headers });
   if (!res.ok) throw new Error(`GitHub ${res.status}: ${path}`);
   return res.json();
 }
@@ -105,15 +102,20 @@ async function fetchGithubRoadmaps(token) {
     })
   );
 
-  const projects = [], milestones = [], tasks = [];
-  for (const r of results) {
+  const projects = [], milestones = [], tasks = [], errors = [];
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
     if (r.status === 'fulfilled') {
       projects.push(r.value.project);
       milestones.push(...r.value.milestones);
       tasks.push(...r.value.tasks);
+    } else {
+      const id = REPOS[i].id;
+      console.warn(`[roadmaps] ${id}: ${r.reason?.message || r.reason}`);
+      errors.push({ repo: id, error: r.reason?.message || String(r.reason) });
     }
   }
-  return { projects, milestones, tasks };
+  return { projects, milestones, tasks, errors };
 }
 
 async function toggleTask(repoId, taskIndex, token) {
