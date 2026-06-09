@@ -21,6 +21,7 @@
 - [x] GitHub-backed View (roadmap.REPO.md lesen + Toggle)
 - [x] Kategorie-Toggle auge-framework / extern
 - [x] Collapse/Expand per Panel (localStorage)
+- [x] Milestone-Layout vertikal (Zeitstrahl, done/now/future States)
 
 ## M3: Tab-Umbau + Admin-Migration
 

@@ -560,47 +560,53 @@ tbody tr:hover { background: var(--surface-2); }
   flex-shrink: 0;
 }
 .roadmap-name { flex: 1; font-weight: 600; font-size: 0.85rem; }
-.roadmap-body { overflow-x: auto; flex: 1; }
-.milestone-row { display: flex; gap: 8px; padding: 8px; min-height: 120px; }
-.milestone-add-col { flex-shrink: 0; }
-.milestone-col {
-  flex-shrink: 0; width: 160px; display: flex; flex-direction: column;
-  background: rgba(255,255,255,0.03); border-radius: 6px; overflow: hidden;
+.roadmap-body { flex: 1; overflow-y: auto; }
+
+/* ── Milestone vertical stack ─────────────────────────────────────────────── */
+.milestones-stack { display: flex; flex-direction: column; gap: 4px; padding: 8px; }
+
+.milestone-row {
+  border-radius: 6px; overflow: hidden;
+  background: rgba(255,255,255,0.03);
+  transition: opacity 0.15s;
 }
-.milestone-col.is-now {
-  border-left: 2px solid var(--accent, #00d4c8);
-}
-.milestone-col.dragover { outline: 2px dashed rgba(255,255,255,0.3); }
+.milestone-row.is-done   { opacity: 0.5; }
+.milestone-row.is-now    { border-left: 3px solid #00d4c8; opacity: 1; }
+.milestone-row.is-future { opacity: 0.7; }
+
 .milestone-header {
-  display: flex; align-items: center; gap: 4px;
-  padding: 5px 6px; background: rgba(255,255,255,0.05);
-  font-size: 0.75rem; flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  font-size: 0.8rem; user-select: none; cursor: pointer;
 }
-.ms-name { flex: 1; outline: none; min-width: 0; }
-.ms-name:focus { background: rgba(255,255,255,0.06); border-radius: 3px; }
-.rm-set-now.is-now-btn { color: var(--accent, #00d4c8); }
-.now-badge {
-  font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--accent, #00d4c8); padding: 2px 6px;
-  background: rgba(0,212,200,0.08); text-align: center;
+.milestone-row.is-now .milestone-header { cursor: default; }
+.milestone-icon { width: 14px; text-align: center; flex-shrink: 0; }
+.milestone-row.is-done   .milestone-icon { color: #4ade80; }
+.milestone-row.is-now    .milestone-icon { color: #00d4c8; }
+.milestone-row.is-future .milestone-icon { color: #a855f7; }
+.milestone-name  { flex: 1; }
+.milestone-count { font-size: 0.72rem; opacity: 0.6; }
+
+.milestone-tasks { padding: 0 10px 8px 32px; display: flex; flex-direction: column; gap: 3px; }
+.milestone-tasks.hidden { display: none; }
+
+.task-row {
+  display: flex; gap: 6px; align-items: flex-start;
+  font-size: 0.82rem; line-height: 1.4;
 }
-.task-list { flex: 1; padding: 6px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.task-row.done { opacity: 0.4; text-decoration: line-through; }
+.task-row input[type=checkbox] { cursor: pointer; margin-top: 2px; flex-shrink: 0; }
+
+/* Keep old task-card rules alive (used by OrientDB roadmaps if still rendered) */
 .task-card {
   background: rgba(255,255,255,0.06); border-radius: 6px;
-  padding: 5px 7px; cursor: grab; font-size: 0.82rem;
+  padding: 5px 7px; font-size: 0.82rem;
   display: flex; align-items: flex-start; gap: 4px;
   transition: opacity 0.15s;
 }
 .task-card.done { opacity: 0.4; }
 .task-card.done .task-title { text-decoration: line-through; }
-.task-card.dragging { opacity: 0.3; }
-.task-drag { color: var(--muted); cursor: grab; flex-shrink: 0; font-size: 0.9rem; }
 .task-title { flex: 1; outline: none; word-break: break-word; line-height: 1.4; }
-.task-title:focus { background: rgba(255,255,255,0.06); border-radius: 3px; }
-.rm-task-footer { padding: 4px 6px; flex-shrink: 0; }
-.rm-task-form {
-  display: flex; gap: 4px; padding: 4px 6px; align-items: center;
-}
+
 .inp-sm { font-size: 0.78rem; padding: 3px 6px; }
 .btn-xs { font-size: 0.7rem; padding: 2px 6px; }
-.rm-ms-form { display: flex; gap: 4px; align-items: center; padding: 4px; }
