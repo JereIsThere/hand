@@ -12,6 +12,7 @@ import { setupVault } from './vault.js';
 import { setupShellLog } from './shell-log.js';
 import { setupSprecher } from './sprecher.js';
 import { setupRoadmaps } from './roadmaps.js';
+import { setupCapture } from './capture.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const _require = createRequire(import.meta.url);
@@ -93,6 +94,9 @@ app.get('/api/version', (_req, res) => res.json({ version: APP_VERSION }));
 // sonst würde das blanket requireAdmin unten die Routes abschatten.
 const sprecherModule  = setupSprecher(app,  { odb, dbName: ORIENTDB_DB, requireAuth: authz.requireAuth });
 setupRoadmaps(app, { odb, dbName: ORIENTDB_DB });
+
+// capture nutzt eigenen Bearer-Token (Auge-App) — ebenfalls VOR dem Admin-Gate.
+const captureModule = setupCapture(app, { odb, dbName: ORIENTDB_DB });
 
 // Ab hier: alle weiteren /api-Endpoints sind Admin-only.
 app.use('/api', authz.requireAdmin());
@@ -704,7 +708,9 @@ export async function startServer() {
     }
     if (process.env.ANTHROPIC_API_KEY) await shellLogModule.ensureSchema();
     await sprecherModule.ensureSchema();
-    const schemas = ['Submission', authz.enabled && 'Person', process.env.VAULT_KEY && 'Secret', process.env.ANTHROPIC_API_KEY && 'ShellLog'].filter(Boolean);
+    // Nach dem Vault-Load, damit ein CAPTURE_API_KEY aus dem Vault zählt.
+    if (process.env.CAPTURE_API_KEY) await captureModule.ensureSchema();
+    const schemas = ['Submission', authz.enabled && 'Person', process.env.VAULT_KEY && 'Secret', process.env.ANTHROPIC_API_KEY && 'ShellLog', process.env.CAPTURE_API_KEY && 'Capture'].filter(Boolean);
     console.log(`        Schema (${schemas.join(' + ')}): ok`);
   } catch (e) {
     console.error(`  ! Schema nicht angelegt (OrientDB erreichbar?): ${e.message}`);
