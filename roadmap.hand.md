@@ -4,6 +4,7 @@
 > Unpriorisierte Ideen ohne aktuellen Milestone.
 
 - [ ] casual-User-Seite (Submissions einreichen ohne Admin)
+- [ ] Schlüsselbund — Key-Rotation-Tab: Alter pro Key, Ein-Klick-Rotation für eigene Tokens, geführter Flow für Provider-Keys, Grace-Window (docs/feature-schluesselbund.md)
 
 ## M1: Core-Tabs
 > Grundtabs, Electron-Shell, Auth, Atlas Cloud Integration, Auto-Deploy.
