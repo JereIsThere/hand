@@ -61,6 +61,15 @@ export const SETUP_KEYS = [
     bootstrapHint: true,
   },
   {
+    key: 'CAPTURE_API_KEY',
+    label: 'Capture API Key',
+    service: 'capture',
+    description: 'Bearer-Token für POST /api/capture (Funkner-Sync der Auge-App). Selbst generieren: 32 Bytes Hex.',
+    placeholder: '64 Hex-Zeichen…',
+    secret: true,
+    group: 'Auth',
+  },
+  {
     key: 'SSH_HOST',
     label: 'SSH Host',
     service: 'server',
