@@ -369,6 +369,23 @@ export function showSetupWizard(status, force = false) {
       el('div', { style: 'margin-top:14px;' }, checkBtn)
     ),
     (() => {
+      const lastPr = el('div', { style: 'font-size:12px; color:#9a8fb5; margin-bottom:12px;' }, 'Letzter PR: lädt…');
+      fetch('https://api.github.com/repos/JereIsThere/hand/pulls?state=closed&sort=updated&direction=desc&per_page=10')
+        .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+        .then(pulls => {
+          const merged = pulls.find(p => p.merged_at);
+          lastPr.innerHTML = '';
+          if (!merged) return;
+          lastPr.append(
+            'Letzter PR: ',
+            el('a', {
+              href: merged.html_url, target: '_blank', rel: 'noopener',
+              style: 'color:#00d4c8; text-decoration:none;',
+            }, `#${merged.number} ${merged.title}`),
+          );
+        })
+        .catch(() => { lastPr.innerHTML = ''; });
+
       const list = el('div', { id: 'update-history-list', style: 'display:flex; flex-direction:column; gap:10px;' },
         el('div', { style: 'font-size:12px; color:#6f6488;' }, 'Lade Verlauf…')
       );
@@ -415,6 +432,7 @@ export function showSetupWizard(status, force = false) {
         el('p', { style: 'font-size:12px; color:#9a8fb5; margin-bottom:14px; line-height:1.5;' },
           'Liste aller veröffentlichten Versionen aus GitHub. Stable und Beta gemischt.'
         ),
+        lastPr,
         list
       );
     })()
