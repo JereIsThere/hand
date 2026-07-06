@@ -6,25 +6,42 @@ Betas laufen als `X.Y.Z-beta.N` im `dev`-Update-Channel.
 
 ---
 
-## [Unreleased] — v1.2.0
+## [Unreleased]
 
-> PRs: [#35](https://github.com/JereIsThere/hand/pull/35) · [#36](https://github.com/JereIsThere/hand/pull/36)
+> Noch keine Änderungen.
+
+---
+
+## [1.2.0] — 2026-07-06
 
 ### Hinzugefügt
+- **Capture-API** — `POST /api/capture` für Roh-Einträge aus der Auge-App; `GET /api/capture` mit `since`-Cursor, `GET /api/capture/search` mit semantischer Suche (Embedding via gehirn, Fallback LIKE)
+- **Roadmaps-Tab** — Projektkarten mit Milestones + Tasks (#44); vertikales Milestone-Timeline-Layout (#46); GitHub-backed View: `roadmap.REPO.md` read + Checkbox-Toggle (#45); Milestone-Sortierung + Descriptions (#49)
+- **Roadmap-Integration ADRs** — Au (Knowledge-Pipeline M1-M2), Zettel+Tafel M3, auge-app Launcher M4 (#50)
+- **Capure-Auth** — `GEHIRN_API_KEY` Wiring + `gehirnHeaders()` Helper (ADR 0016, #51)
 - **Dynamische Versionsnummer** — `GET /api/version` liest aus `package.json`; Sidebar-Label folgt automatisch jedem `npm version`-Bump
 - **Update-Notification** — Windows-style Toast (rechts unten, slide-in):
   - Electron: IPC-Events von `electron-updater` (`available → downloading → ready`)
   - Dev (`npm start`): `GET /api/updates/check` → GitHub-Releases-API, manuell per Rechtsklick
   - Rechtsklick auf Badge (Electron): Channel-Wechsel `latest ↔ beta`
+- **sprecher: Atlas Cloud Image-Modelle** — Flux, Imagen, Ideogram, Seedream, Z-Image im Mode-Selector
 - **sprecher: No-Keys-State** — sauberes Feedback statt unsichtbarer leerer Dropdowns; Setup-CTA direkt in der Topbar
 - **sprecher: Inline-Titelbearbeitung** — kein `prompt()` mehr; Klick öffnet `<input>` in-place
 - **sprecher: Custom Confirm** — Session löschen: 2-Klick-Pattern statt `confirm()`
 - **sprecher: System-Prompt-Panel** — ⚙-Button in Topbar, debounced autosave, per Session persistiert
 - **Setup-Wizard: OpenAI + Gemini Keys** — `OPENAI_API_KEY` + `GEMINI_API_KEY` konfigurierbar
+- **Dev-Client** — `Die Hand Dev` als separater Electron-Build (anderer Name, eigenes Icon, eigener Channel)
 
 ### Geändert
 - sprecher Textarea: auto-resize auch auf `input`-Event (war nur `keydown`)
 - sprecher Platzhalter: `/image [prompt]`-Hinweis entfernt (Mode-Selector macht ihn obsolet)
+- submission-Build direkt in hand, n8n-Workflow abgelöst
+- CI: `notify-framework`-Workflow bei main-Push (#8)
+
+### Behoben
+- Roadmaps: private Repos (gehirn, funkner) wurden nicht geladen (#47)
+- `ATLAS-` Prefix für Atlas Cloud Model-IDs korrigiert
+- Dev-Installer wird jetzt mitgebaut und hochgeladen
 
 ---
 
