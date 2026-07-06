@@ -8,7 +8,7 @@
 // Ohne gesetzten Key antworten alle Endpoints mit 503 (Feature aus).
 //
 // API (Einträge):
-//   POST   /api/capture             { text, timestamp?, clientId?, chatId? }
+//   POST   /api/capture             { text, timestamp?, clientId?, chatId?, sender? }
 //   GET    /api/capture?since=&limit=       Liste inkl. Tombstones + serverTime
 //   PUT    /api/capture/:clientId   { text, updatedAt, chatId? }   LWW
 //   DELETE /api/capture/:clientId   Soft-Delete (Tombstone)
@@ -33,6 +33,7 @@ import { timingSafeEqual } from 'crypto';
 const sqlStr = (s) => `'${String(s == null ? '' : s).replace(/'/g, "''")}'`;
 
 const CHAT_KINDS = ['chat', 'projekt'];
+const ENTRY_SENDERS = ['user', 'ai'];
 
 export function setupCapture(app, { odb, dbName }) {
   const sql = (cmd) => odb(`/command/${dbName}/sql`, {
@@ -48,6 +49,9 @@ export function setupCapture(app, { odb, dbName }) {
       'CREATE PROPERTY Capture.text       IF NOT EXISTS STRING',
       'CREATE PROPERTY Capture.clientId   IF NOT EXISTS STRING',
       'CREATE PROPERTY Capture.chatId     IF NOT EXISTS STRING',
+      // 'user' (Default) | 'ai' — Antwort von gehirn via Funkners "An Modell
+      // senden". Reine Durchreiche, hand klassifiziert/interpretiert nicht.
+      'CREATE PROPERTY Capture.sender     IF NOT EXISTS STRING',
       'CREATE PROPERTY Capture.capturedAt IF NOT EXISTS DATETIME',
       'CREATE PROPERTY Capture.createdAt  IF NOT EXISTS DATETIME',
       'CREATE PROPERTY Capture.updatedAt  IF NOT EXISTS DATETIME',
@@ -244,6 +248,7 @@ export function setupCapture(app, { odb, dbName }) {
       }
 
       const now = fmtDate(Date.now());
+      const sender = ENTRY_SENDERS.includes(b.sender) ? b.sender : 'user';
       const record = await odb(`/document/${dbName}`, {
         method: 'POST',
         body: JSON.stringify({
@@ -251,6 +256,7 @@ export function setupCapture(app, { odb, dbName }) {
           text,
           clientId,
           chatId: b.chatId ? String(b.chatId).slice(0, 64) : null,
+          sender,
           capturedAt: capturedAt ?? now,
           createdAt: now,
           updatedAt: now,
