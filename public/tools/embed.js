@@ -1,6 +1,6 @@
-// Embed-Tools: bettet externe Seiten (projects, funkner) per iframe ein.
+// Embed-Tools: bettet externe Seiten (projects) per iframe ein.
 // Lazy-Load beim ersten Aktivieren, "neuer Tab"-Fallback, Blocked-Detection.
-import { $$ } from '../shared/ui.js';
+import { $, $$, toast } from '../shared/ui.js';
 
 const loaded = new Set();
 

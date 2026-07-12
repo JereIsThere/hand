@@ -13,7 +13,7 @@ import { setupShellLog } from './shell-log.js';
 import { setupSprecher } from './sprecher.js';
 import { setupRoadmaps } from './roadmaps.js';
 import { setupCapture } from './capture.js';
-import { setupFunknerChat } from './funkner-chat.js';
+
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const _require = createRequire(import.meta.url);
@@ -99,8 +99,7 @@ setupRoadmaps(app, { odb, dbName: ORIENTDB_DB });
 // capture nutzt eigenen Bearer-Token (Auge-App) — ebenfalls VOR dem Admin-Gate.
 const captureModule = setupCapture(app, { odb, dbName: ORIENTDB_DB });
 
-// funkner-chat (KI-Chat für Auge-App) — ebenfalls CAPTURE_API_KEY, VOR dem Admin-Gate.
-setupFunknerChat(app);
+
 
 // Ab hier: alle weiteren /api-Endpoints sind Admin-only.
 app.use('/api', authz.requireAdmin());
@@ -675,6 +674,8 @@ app.post('/api/tunnels/:id/stop', wrap(async (req) => {
 app.get('/api/tunnels/:id/log', wrap(async (req) => {
   return { log: tunnels.get(safeId(req.params.id)).log };
 }));
+
+
 
 // ============================================================
 // static + lifecycle

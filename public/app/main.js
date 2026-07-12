@@ -20,7 +20,7 @@ import { checkAndShowSetupWizard, initSetupButton } from '../auth/setup.js';
 // ----------------------------------------------------------------
 // Shell: sidebar tool-switching
 // ----------------------------------------------------------------
-const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'funkner', 'sprecher', 'roadmaps', 'ueber', 'willkommen'];
+const TOOLS = ['orientdb', 'tunnels', 'submissions', 'vault', 'friends', 'projects', 'sprecher', 'roadmaps', 'ueber', 'willkommen'];
 
 function switchTool(name) {
   const fallback = isAdmin() ? 'orientdb' : 'willkommen';
@@ -44,7 +44,7 @@ function switchTool(name) {
   else                    deactivateVaultUi();
   if (name === 'friends') activateFriends();
   else                    deactivateFriends();
-  if (name === 'projects' || name === 'funkner') activateEmbed(name);
+  if (name === 'projects') activateEmbed(name);
   if (name === 'roadmaps') activateRoadmaps();
   else                     deactivateRoadmaps();
 }
